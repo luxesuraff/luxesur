@@ -1,0 +1,156 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { cities } from "../../data/cities";
+import { INTENT_CONFIG } from "../../config/intents";
+import Hero from "../../components/Hero.astro";
+
+export async function getStaticPaths() {
+  return cities.map((city) => ({
+    params: { city: city.slug },
+    props: { city },
+  }));
+}
+
+const { city } = Astro.props;
+
+const cityName = city.city;
+const state = city.state;
+
+// 🔒 LOCKED INTENT KEY
+const intent = "emergency-plumbing";
+const intentConfig = INTENT_CONFIG[intent];
+
+const pageTitle = `Emergency Plumbing in ${cityName}, ${state} | Local Help Available`;
+const metaDescription = `Need emergency plumbing in ${cityName}, ${state}? Get help for urgent plumbing issues like leaks, backups, and sudden water loss. Call now.`;
+---
+<BaseLayout title={pageTitle} description={metaDescription}>
+
+{intentConfig.ctaEnabled && (
+  <Hero
+    src="/images/emergency-plumbing/emergency/hero.webp"
+    alt={`Emergency plumbing help in ${cityName}, ${state}`}
+    phone={intentConfig.phone}
+  />
+)}
+
+<!-- HERO / ABOVE THE FOLD -->
+<section class="hero">
+  <h1>Emergency Plumbing in {cityName}, {state}</h1>
+
+  <p>
+    Plumbing emergencies can cause serious damage if not addressed quickly.
+    Issues such as burst pipes, sewer backups, or sudden water loss require
+    immediate attention.
+  </p>
+
+  <p>
+    If you are dealing with an urgent plumbing problem in {cityName}, {state},
+    help may be available through independent local plumbing professionals.
+  </p>
+
+  <Hero
+  src="/images/emergency-plumbing/emergency/hero.webp"
+  alt={`Emergency plumbing help in ${cityName}, ${state}`}
+  phone={intentConfig.ctaEnabled ? intentConfig.phone : null}
+/>
+  )}
+</section>
+
+<!-- WHAT COUNTS AS AN EMERGENCY -->
+<section>
+  <h2>What Is Considered a Plumbing Emergency?</h2>
+
+  <p>
+    A plumbing emergency typically involves a situation that risks immediate
+    damage to your home or disrupts essential water access. These problems
+    often escalate quickly if left unresolved.
+  </p>
+
+  <ul>
+    <li>Burst or leaking pipes</li>
+    <li>Sewer backups or overflowing drains</li>
+    <li>No running water or sudden pressure loss</li>
+    <li>Water heater failures</li>
+  </ul>
+</section>
+
+<!-- WHY FAST RESPONSE MATTERS -->
+<section>
+  <h2>Why Fast Emergency Plumbing Response Matters</h2>
+
+  <p>
+    Water-related plumbing failures can damage walls, floors, and foundations
+    in a short amount of time. Sewer issues may also introduce health and
+    safety concerns.
+  </p>
+
+  <p>
+    Addressing emergency plumbing problems promptly can help limit damage,
+    reduce repair costs, and restore normal use of your plumbing system.
+  </p>
+</section>
+
+<!-- HOW SERVICE TYPICALLY WORKS -->
+<section>
+  <h2>How Emergency Plumbing Service Typically Works</h2>
+
+  <p>
+    Emergency plumbing service generally focuses on stabilizing the situation
+    first, followed by targeted repair.
+  </p>
+
+  <ol>
+    <li>Assessment of the plumbing issue</li>
+    <li>Shutoff or containment to stop further damage</li>
+    <li>Repair or temporary fix depending on severity</li>
+    <li>Recommendations for any follow-up service</li>
+  </ol>
+</section>
+
+<!-- LOCAL CONTEXT -->
+<section>
+  <h2>Emergency Plumbing Services in {cityName}, {state}</h2>
+
+  <p>
+    Homes and properties in {cityName} may experience plumbing emergencies due
+    to aging pipes, weather conditions, or unexpected system failures.
+  </p>
+
+  <p>
+    Local plumbing professionals familiar with the area can respond when
+    urgent plumbing problems occur.
+  </p>
+</section>
+
+<!-- TRUST FRAMING -->
+<section>
+  <h2>Get Help From Qualified Plumbing Professionals</h2>
+
+  <p>
+    Emergency plumbing issues are typically handled by licensed and insured
+    professionals trained to address urgent situations safely and efficiently.
+  </p>
+
+  <p>
+    If you are facing a plumbing emergency, acting quickly can help protect
+    your property and restore peace of mind.
+  </p>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <h2>Need Emergency Plumbing Help in {cityName}?</h2>
+
+  <p>
+    If you are experiencing an urgent plumbing issue, assistance may be
+    available. Connect with a local emergency plumbing provider for help.
+  </p>
+
+  {intentConfig.ctaEnabled && (
+    <a href={intentConfig.phone} class="cta-button">
+      Call Now for Emergency Plumbing Assistance
+    </a>
+  )}
+</section>
+
+</BaseLayout>

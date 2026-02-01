@@ -1,0 +1,13 @@
+---
+const { phone } = Astro.props;
+---
+
+{phone ? (
+  <a class="cta" href={`tel:${phone}`}>
+    Call for immediate assistance
+  </a>
+) : (
+  <div class="cta" style="cursor: pointer;">
+    Call for immediate assistance
+  </div>
+)}

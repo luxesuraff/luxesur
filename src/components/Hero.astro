@@ -1,0 +1,76 @@
+---
+const { src, alt, phone, position } = Astro.props;
+
+const formatPhone = (num) => {
+  if (!num) return "";
+  const digits = num.replace(/\D/g, "");
+  return digits.replace(/^1?(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
+};
+---
+
+<div class="hero">
+  <img src={src} alt={alt} />
+
+  {phone && (
+    <div class="hero-cta">
+      <p>Call for Emergency Help</p>
+      <a href={phone}>
+        <strong>{formatPhone(phone)}</strong>
+      </a>
+    </div>
+  )}
+</div>
+
+<style>
+.hero {
+  position: relative;
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.hero img {
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+/* HERO CTA (DESKTOP + TABLET ONLY) */
+.hero-cta {
+  position: absolute;
+  bottom: 24px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 14px 18px;
+  border-radius: 8px;
+  max-width: 240px;
+}
+
+.hero-cta a {
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.hero-cta a strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 6px;
+  letter-spacing: 0.6px;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .hero img {
+    height: 300px;
+  }
+
+  .hero-cta {
+    display: none;
+  }
+}
+</style>

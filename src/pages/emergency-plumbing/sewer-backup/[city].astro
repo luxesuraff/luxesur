@@ -1,0 +1,157 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { cities } from "../../../data/cities";
+import { INTENT_CONFIG, type IntentKey } from "../../../config/intents";
+import Hero from "../../../components/Hero.astro";
+
+export async function getStaticPaths() {
+  return cities.map((city) => ({
+    params: { city: city.slug },
+    props: { city },
+  }));
+}
+
+const { city } = Astro.props;
+
+const cityName = city.city;
+const state = city.state;
+
+// 🔒 LOCKED + TYPED INTENT
+const intent: IntentKey = "sewer-backup";
+const intentConfig = INTENT_CONFIG[intent];
+
+const pageTitle = `Sewer Backup Cleanup in ${cityName}, ${state} | Emergency Plumbing Help`;
+const metaDescription =
+  `Sewer backup in ${cityName}, ${state}? Get emergency plumbing help to address blockages, overflows, and wastewater issues.`;
+---
+<BaseLayout title={pageTitle} description={metaDescription}>
+
+<!-- HERO (IMAGE ALWAYS, CTA CONDITIONAL) -->
+<Hero
+  src="/images/emergency-plumbing/sewer-backup/hero.webp"
+  alt={`Plumber inspecting a sewer backup in ${cityName}, ${state}`}
+  phone={intentConfig.ctaEnabled ? intentConfig.phone : null}
+  position="center bottom"
+/>
+
+  <!-- HERO / ABOVE THE FOLD -->
+  <section class="hero">
+    <h1>Sewer Backup Cleanup in {cityName}, {state}</h1>
+
+    <p>
+      A sewer backup can cause wastewater to overflow into sinks, tubs, toilets,
+      or floor drains. These situations are urgent and may pose health and
+      property risks if not addressed promptly.
+    </p>
+
+    <p>
+      If you are experiencing a sewer backup in {cityName}, {state}, help may be
+      available through independent emergency plumbing professionals.
+    </p>
+
+    {intentConfig.ctaEnabled && intentConfig.phone && (
+      <div class="cta">
+        <a href={intentConfig.phone} class="cta-button">
+          Call Now for Sewer Backup Help
+        </a>
+      </div>
+    )}
+  </section>
+
+  <!-- WHAT CAUSES SEWER BACKUPS -->
+  <section>
+    <h2>Common Causes of Sewer Backups</h2>
+
+    <p>
+      Sewer backups can occur when wastewater cannot flow properly through the
+      plumbing system. Several factors may contribute to these blockages.
+    </p>
+
+    <ul>
+      <li>Clogged or collapsed sewer lines</li>
+      <li>Tree root intrusion</li>
+      <li>Grease or debris buildup</li>
+      <li>Heavy rainfall or system overload</li>
+    </ul>
+  </section>
+
+  <!-- WHY THIS IS AN EMERGENCY -->
+  <section>
+    <h2>Why Sewer Backups Require Immediate Attention</h2>
+
+    <p>
+      Wastewater exposure can damage building materials and may introduce
+      unsanitary conditions inside a home or business.
+    </p>
+
+    <p>
+      Prompt response can help stop the overflow, reduce contamination, and
+      limit the extent of cleanup and repairs.
+    </p>
+  </section>
+
+  <!-- TYPICAL RESPONSE PROCESS -->
+  <section>
+    <h2>How Sewer Backup Emergencies Are Typically Addressed</h2>
+
+    <p>
+      Emergency plumbing response generally focuses on clearing the blockage and
+      restoring proper flow as quickly as possible.
+    </p>
+
+    <ol>
+      <li>Inspection to identify the blockage or failure point</li>
+      <li>Clearing or repairing the affected line</li>
+      <li>Stopping active overflow</li>
+      <li>Guidance on cleanup or follow-up services</li>
+    </ol>
+  </section>
+
+  <!-- LOCAL CONTEXT -->
+  <section>
+    <h2>Sewer Backup Services in {cityName}, {state}</h2>
+
+    <p>
+      Properties in {cityName} may experience sewer backups due to aging sewer
+      infrastructure, environmental conditions, or unexpected line failures.
+    </p>
+
+    <p>
+      Local plumbing professionals familiar with area systems can respond to
+      urgent sewer-related plumbing problems.
+    </p>
+  </section>
+
+  <!-- TRUST FRAMING -->
+  <section>
+    <h2>Get Help From Qualified Plumbing Professionals</h2>
+
+    <p>
+      Sewer backup emergencies are typically handled by licensed and insured
+      plumbers with experience managing wastewater and drainage issues.
+    </p>
+
+    <p>
+      Acting quickly can help protect your property and restore safe plumbing
+      operation.
+    </p>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="final-cta">
+    <h2>Need Sewer Backup Help in {cityName}?</h2>
+
+    <p>
+      If wastewater is backing up into your home or business, assistance may be
+      available. Connect with an emergency plumbing provider for help.
+    </p>
+
+    {intentConfig.ctaEnabled && intentConfig.phone && (
+      <a href={intentConfig.phone} class="cta-button">
+        Call Now for Emergency Plumbing Assistance
+      </a>
+    )}
+  </section>
+
+</BaseLayout>
+

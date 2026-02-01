@@ -1,0 +1,155 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { cities } from "../../../data/cities";
+import { INTENT_CONFIG, type IntentKey } from "../../../config/intents";
+import Hero from "../../../components/Hero.astro";
+
+export async function getStaticPaths() {
+  return cities.map((city) => ({
+    params: { city: city.slug },
+    props: { city },
+  }));
+}
+
+const { city } = Astro.props;
+
+const cityName = city.city;
+const state = city.state;
+
+// 🔒 LOCKED + TYPED INTENT
+const intent: IntentKey = "no-hot-water";
+const intentConfig = INTENT_CONFIG[intent];
+
+const pageTitle = `No Hot Water Repair in ${cityName}, ${state} | Emergency Plumbing Help`;
+const metaDescription =
+  `No hot water in ${cityName}, ${state}? Get emergency plumbing help for water heater failures and sudden loss of hot water.`;
+---
+<BaseLayout title={pageTitle} description={metaDescription}>
+
+<!-- HERO (IMAGE ALWAYS, CTA CONDITIONAL) -->
+<Hero
+  src="/images/emergency-plumbing/no-hot-water/hero.webp"
+  alt={`No hot water repair in ${cityName}, ${state}`}
+  phone={intentConfig.ctaEnabled ? intentConfig.phone : null}
+/>
+
+  <!-- HERO / ABOVE THE FOLD -->
+  <section class="hero">
+    <h1>No Hot Water Repair in {cityName}, {state}</h1>
+
+    <p>
+      Losing hot water unexpectedly can disrupt daily activities and signal a
+      plumbing or water heater problem that needs prompt attention.
+    </p>
+
+    <p>
+      If you have no hot water in {cityName}, {state}, help may be available
+      through independent emergency plumbing professionals.
+    </p>
+
+    {intentConfig.ctaEnabled && intentConfig.phone && (
+      <div class="cta">
+        <a href={intentConfig.phone} class="cta-button">
+          Call Now for No Hot Water Help
+        </a>
+      </div>
+    )}
+  </section>
+
+  <!-- COMMON CAUSES -->
+  <section>
+    <h2>Common Causes of No Hot Water</h2>
+
+    <p>
+      Hot water loss can occur for a variety of reasons, ranging from equipment
+      issues to plumbing system failures.
+    </p>
+
+    <ul>
+      <li>Water heater malfunction or failure</li>
+      <li>Electrical or gas supply issues</li>
+      <li>Thermostat or heating element problems</li>
+      <li>Internal tank or component damage</li>
+    </ul>
+  </section>
+
+  <!-- WHY THIS IS URGENT -->
+  <section>
+    <h2>Why Sudden Loss of Hot Water Should Be Addressed Quickly</h2>
+
+    <p>
+      While not always destructive like active leaks, lack of hot water can
+      indicate underlying issues that may worsen if left unresolved.
+    </p>
+
+    <p>
+      Prompt evaluation can help restore hot water service and prevent further
+      plumbing complications.
+    </p>
+  </section>
+
+  <!-- TYPICAL RESPONSE -->
+  <section>
+    <h2>How No Hot Water Problems Are Typically Resolved</h2>
+
+    <p>
+      Emergency plumbing professionals often begin by diagnosing the cause of
+      the hot water failure before recommending repair or replacement options.
+    </p>
+
+    <ol>
+      <li>Inspection of the water heater and connections</li>
+      <li>Identification of electrical, gas, or mechanical issues</li>
+      <li>Repair or replacement of faulty components</li>
+      <li>Restoration of hot water service</li>
+    </ol>
+  </section>
+
+  <!-- LOCAL CONTEXT -->
+  <section>
+    <h2>No Hot Water Services in {cityName}, {state}</h2>
+
+    <p>
+      Homes and businesses in {cityName} may experience hot water issues due to
+      aging water heaters, system wear, or unexpected equipment failure.
+    </p>
+
+    <p>
+      Local plumbing professionals familiar with area conditions can assist when
+      hot water problems arise.
+    </p>
+  </section>
+
+  <!-- TRUST FRAMING -->
+  <section>
+    <h2>Get Help From Qualified Plumbing Professionals</h2>
+
+    <p>
+      No hot water issues are typically handled by licensed and insured plumbing
+      professionals with experience servicing water heaters and plumbing
+      systems.
+    </p>
+
+    <p>
+      Addressing the issue promptly can help restore comfort and normal use of
+      your plumbing system.
+    </p>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="final-cta">
+    <h2>Need No Hot Water Repair in {cityName}?</h2>
+
+    <p>
+      If your hot water supply has stopped working, assistance may be available.
+      Connect with an emergency plumbing provider for help.
+    </p>
+
+    {intentConfig.ctaEnabled && intentConfig.phone && (
+      <a href={intentConfig.phone} class="cta-button">
+        Call Now for Emergency Plumbing Assistance
+      </a>
+    )}
+  </section>
+
+</BaseLayout>

@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Block internal / non-content paths (none currently, placeholder)
+Disallow: /api/
+Disallow: /_astro/
+
+# Sitemap location
+Sitemap: https://www.luxesur.com/sitemap.xml

@@ -1,6 +1,9 @@
 import type { APIRoute } from "astro";
 import { cities } from "../data/cities";
 
+const SITE_URL = "https://www.luxesur.com";
+
+// Static pages
 const staticPages = [
   "/",
   "/about",
@@ -11,28 +14,35 @@ const staticPages = [
   "/emergency-plumbing",
 ];
 
-const intents = [
-  "", // base emergency plumbing city page
-  "/burst-pipe",
-  "/sewer-backup",
-  "/no-hot-water",
-];
-
 export const GET: APIRoute = async () => {
   const urls: string[] = [];
 
-  // Static pages
+  // Add static pages
   for (const path of staticPages) {
-    urls.push(`https://www.luxesur.com${path}`);
+    urls.push(`${SITE_URL}${path}/`);
   }
 
-  // City intent pages
+  // Add city pages for each intent
   for (const city of cities) {
-    for (const intent of intents) {
-      const base = "/emergency-plumbing";
-      const cityPath = `${base}${intent}/${city.slug}`;
-      urls.push(`https://www.luxesur.com${cityPath}`);
-    }
+    const slug = city.slug;
+
+    // Base emergency plumbing city page
+    urls.push(`${SITE_URL}/emergency-plumbing/${slug}/`);
+
+    // Burst pipe
+    urls.push(
+      `${SITE_URL}/emergency-plumbing/burst-pipe/${slug}/`
+    );
+
+    // Sewer backup
+    urls.push(
+      `${SITE_URL}/emergency-plumbing/sewer-backup/${slug}/`
+    );
+
+    // No hot water
+    urls.push(
+      `${SITE_URL}/emergency-plumbing/no-hot-water/${slug}/`
+    );
   }
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

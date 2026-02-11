@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://www.luxesur.com/sitemaps/sitemap-core.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.luxesur.com/sitemaps/sitemap-emergency.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.luxesur.com/sitemaps/sitemap-burst.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.luxesur.com/sitemaps/sitemap-sewer.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.luxesur.com/sitemaps/sitemap-heater.xml</loc>
+  </sitemap>
+</sitemapindex>

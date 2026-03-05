@@ -1,8 +1,8 @@
 ---
-import BaseLayout from "../../../layouts/BaseLayout.astro";
-import { cities } from "../../../data/cities";
-import { INTENT_CONFIG, type IntentKey } from "../../../config/intents";
-import Hero from "../../../components/Hero.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cities } from "@/data/cities";
+import { INTENT_CONFIG, type IntentKey } from "@/config/intents";
+import Hero from "@/components/Hero.astro";
 
 export async function getStaticPaths() {
   return cities.map((city) => ({
@@ -12,144 +12,158 @@ export async function getStaticPaths() {
 }
 
 const { city } = Astro.props;
-
 const cityName = city.city;
 const state = city.state;
 
-// 🔒 LOCKED + TYPED INTENT (PREVENTS FUTURE MISTAKES)
+// 🔒 LOCKED + TYPED INTENT
 const intent: IntentKey = "burst-pipe";
 const intentConfig = INTENT_CONFIG[intent];
 
 const pageTitle = `Burst Pipe Repair in ${cityName}, ${state} | Emergency Plumbing Help`;
 const metaDescription =
-  `Dealing with a burst pipe in ${cityName}, ${state}? Get emergency plumbing help to stop leaks, limit damage, and restore water service.`;
+  `Dealing with a burst pipe in ${cityName}, ${state}? Learn how emergency plumbing services can help stop leaks, limit damage, and restore safe water service.`;
+
+const currentIndex = cities.findIndex(c => c.slug === city.slug);
+const nearbyCities = cities
+  .slice(currentIndex + 1, currentIndex + 7)
+  .filter(Boolean);
 ---
+
 <BaseLayout title={pageTitle} description={metaDescription}>
 
-<Hero
-  src="/images/emergency-plumbing/burst-pipe/hero.webp"
-  alt={`Burst pipe repair in ${cityName}, ${state}`}
-  phone={intentConfig.ctaEnabled ? intentConfig.phone : null}
-/>
+  <!-- HERO (NO PHONE ON BURST PIPE) -->
+  <Hero
+    src="/images/emergency-plumbing/burst-pipe/hero.webp"
+    alt={`Burst pipe repair in ${cityName}, ${state}`}
+    phone={null}
+  />
 
-<!-- HERO / ABOVE THE FOLD -->
-<section class="hero">
-  <h1>Burst Pipe Repair in {cityName}, {state}</h1>
+  <!-- INTRO -->
+  <section class="hero">
+    <h1>Burst Pipe Repair in {cityName}, {state}</h1>
 
-  <p>
-    A burst pipe can release large amounts of water in a short time, causing
-    damage to walls, floors, and personal belongings. Immediate action is
-    often required to prevent further loss.
-  </p>
+    <p>
+      A burst pipe can release large amounts of water in a short period of time,
+      leading to damage to walls, flooring, and personal belongings. Immediate
+      action is often required to prevent further loss.
+    </p>
 
-  <p>
-    If you are experiencing a burst or severely leaking pipe in {cityName},
-    {state}, help may be available through independent emergency plumbing
-    professionals.
-  </p>
+    <p>
+      Burst pipe situations are considered plumbing emergencies and are
+      typically handled by licensed emergency plumbing professionals serving
+      {cityName}, {state}.
+    </p>
+  </section>
 
-  {intentConfig.ctaEnabled && intentConfig.phone && (
-    <div class="cta">
-      <a href={intentConfig.phone} class="cta-button">
-        Call Now for Burst Pipe Help
-      </a>
-    </div>
-  )}
-</section>
+  <!-- CAUSES -->
+  <section>
+    <h2>What Causes Pipes to Burst?</h2>
 
-<!-- WHAT CAUSES BURST PIPES -->
-<section>
-  <h2>What Causes Pipes to Burst?</h2>
+    <p>
+      Pipes can burst for a variety of reasons, often without warning.
+      Older plumbing systems, sudden pressure changes, or environmental
+      conditions may increase the risk.
+    </p>
 
-  <p>
-    Pipes can burst for several reasons, often without warning. Older plumbing
-    systems and sudden environmental changes increase the risk.
-  </p>
+    <ul>
+      <li>Freezing or extreme temperature changes</li>
+      <li>Corroded or aging pipes</li>
+      <li>Sudden increases in water pressure</li>
+      <li>Previous damage or improper installation</li>
+    </ul>
+  </section>
 
-  <ul>
-    <li>Freezing temperatures</li>
-    <li>Corroded or aging pipes</li>
-    <li>Sudden pressure changes</li>
-    <li>Improper installation or prior damage</li>
-  </ul>
-</section>
+  <!-- WHY EMERGENCY -->
+  <section>
+    <h2>Why a Burst Pipe Is a Plumbing Emergency</h2>
 
-<!-- WHY THIS IS AN EMERGENCY -->
-<section>
-  <h2>Why a Burst Pipe Is a Plumbing Emergency</h2>
+    <p>
+      Water from a burst pipe can spread rapidly throughout a property,
+      soaking building materials and creating conditions for structural
+      damage or mold growth.
+    </p>
 
-  <p>
-    Water from a burst pipe can spread rapidly, soaking building materials and
-    creating conditions for long-term structural issues.
-  </p>
+    <p>
+      Emergency plumbing response is often needed to stop water flow,
+      stabilize the situation, and prevent additional damage.
+    </p>
+  </section>
 
-  <p>
-    Quick response can help limit water damage, reduce repair costs, and
-    restore safe plumbing operation.
-  </p>
-</section>
+  <!-- 🔗 PARENT SERVICE BRIDGE (CRITICAL FIX) -->
+  <section>
+    <h2>How Burst Pipe Emergencies Are Typically Handled in {cityName}, {state}</h2>
 
-<!-- TYPICAL RESPONSE PROCESS -->
-<section>
-  <h2>How Burst Pipe Emergencies Are Typically Handled</h2>
+    <p>
+      Burst pipe emergencies are typically addressed by emergency plumbing
+      professionals who are equipped to respond quickly and assess the
+      severity of the situation.
+    </p>
 
-  <p>
-    Emergency plumbing response usually focuses on stopping water flow and
-    stabilizing the situation before permanent repairs are completed.
-  </p>
+    <p>
+      Emergency plumbing response may involve shutting off water supply,
+      isolating the damaged pipe, performing temporary or permanent repairs,
+      and advising on next steps to restore safe plumbing operation.
+    </p>
+  </section>
 
-  <ol>
-    <li>Shutting off the water supply</li>
-    <li>Locating and isolating the damaged pipe</li>
-    <li>Repairing or temporarily sealing the break</li>
-    <li>Advising on additional repairs if needed</li>
-  </ol>
-</section>
+  <!-- FUNNEL CONNECTOR (NO PHONE) -->
+  <section>
+    <h3>Emergency Plumbing Help for Burst Pipe Situations</h3>
 
-<!-- LOCAL CONTEXT -->
-<section>
-  <h2>Burst Pipe Repair Services in {cityName}, {state}</h2>
+    <p>
+      Because burst pipes require immediate attention, emergency plumbing
+      services are often needed to prevent further property damage and
+      restore safe water flow.
+    </p>
 
-  <p>
-    Properties in {cityName} may experience burst pipe issues due to seasonal
-    weather, aging infrastructure, or unexpected plumbing failures.
-  </p>
-
-  <p>
-    Local plumbing professionals familiar with the area can respond to urgent
-    burst pipe situations when they occur.
-  </p>
-</section>
-
-<!-- TRUST FRAMING -->
-<section>
-  <h2>Get Help From Qualified Plumbing Professionals</h2>
-
-  <p>
-    Burst pipe emergencies are typically handled by licensed and insured
-    plumbers with experience addressing urgent water-related issues.
-  </p>
-
-  <p>
-    Acting quickly can help protect your property and reduce the impact of
-    water damage.
-  </p>
-</section>
-
-<!-- FINAL CTA (STILL GATED) -->
-<section class="final-cta">
-  <h2>Need Burst Pipe Repair in {cityName}?</h2>
-
-  <p>
-    If a pipe has burst or is actively leaking, assistance may be available.
-    Connect with an emergency plumbing provider for help.
-  </p>
-
-  {intentConfig.ctaEnabled && intentConfig.phone && (
-    <a href={intentConfig.phone} class="cta-button">
-      Call Now for Emergency Plumbing Assistance
+    <a href={`/emergency-plumbing/${city.slug}/`} class="cta-button">
+      Get Emergency Plumbing Help in {cityName}
     </a>
-  )}
-</section>
+  </section>
+
+  <!-- LOCAL CONTEXT -->
+  <section>
+    <h2>Burst Pipe Issues in {cityName}, {state}</h2>
+
+    <p>
+      Properties in {cityName} may experience burst pipe issues due to
+      seasonal weather, aging infrastructure, or unexpected plumbing failures.
+    </p>
+
+    <p>
+      Emergency plumbing professionals familiar with local conditions can
+      respond to urgent burst pipe situations when they occur.
+    </p>
+  </section>
+
+  <!-- TRUST FRAMING -->
+  <section>
+    <h2>Get Help From Qualified Emergency Plumbing Professionals</h2>
+
+    <p>
+      Burst pipe emergencies are typically handled by licensed and insured
+      emergency plumbing professionals experienced in addressing urgent
+      water-related issues.
+    </p>
+
+    <p>
+      Acting quickly can help reduce the impact of water damage and protect
+      your property.
+    </p>
+  </section>
+
+  <!-- NEARBY CITIES (KEEP INTENT-SPECIFIC) -->
+  <section class="nearby-cities">
+    <h2>Nearby Service Areas</h2>
+    <ul>
+      {nearbyCities.map((c) => (
+        <li>
+          <a href={`/emergency-plumbing/burst-pipe/${c.slug}/`}>
+            Burst Pipe Repair in {c.city}, {c.state}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
 
 </BaseLayout>

@@ -1,13 +1,43 @@
 ---
-const { phone } = Astro.props;
+type Props = {
+  phoneNumber?: string | null;
+  label?: string;
+  subtext?: string;
+  className?: string;
+};
+
+const {
+  phoneNumber = null,
+  label = "Call Now",
+  subtext = "",
+  className = "cta"
+} = Astro.props;
+
+/*
+  PRESENTATIONAL COMPONENT ONLY
+
+  All business logic must live in the page:
+  - Supabase queries
+  - vertical_cta_settings
+  - language selection
+  - call enable / disable
+*/
 ---
 
-{phone ? (
-  <a class="cta" href={`tel:${phone}`}>
-    Call for immediate assistance
+{phoneNumber && (
+  <a
+    href={`tel:${phoneNumber}`}
+    class={className}
+    rel="nofollow"
+    role="button"
+    aria-label={`${label} ${phoneNumber}`}
+  >
+    <span class="cta-label">{label}</span>
+
+    {subtext && (
+      <small class="cta-subtext">
+        {subtext}
+      </small>
+    )}
   </a>
-) : (
-  <div class="cta" style="cursor: pointer;">
-    Call for immediate assistance
-  </div>
 )}

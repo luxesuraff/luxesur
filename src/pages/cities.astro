@@ -1,0 +1,62 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL,
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+);
+
+/* Fetch all active metros */
+
+const { data: metros } = await supabase
+  .from("metros")
+  .select("city, slug, state")
+  .eq("active", true)
+  .order("state", { ascending: true })
+  .order("city", { ascending: true });
+
+/* Group metros by state */
+
+const states = {};
+
+metros?.forEach((m) => {
+  if (!states[m.state]) {
+    states[m.state] = [];
+  }
+
+  states[m.state].push(m);
+});
+---
+
+<BaseLayout
+  title="Cities We Serve | Luxesur"
+  brand="Luxesur"
+  domain="https://www.luxesur.com"
+>
+
+<h1>Cities We Serve</h1>
+
+<p>
+Luxesur connects homeowners with independent plumbing professionals
+across major metropolitan areas in the United States.
+Select your city below to view available services.
+</p>
+
+{Object.entries(states).map(([state, metros]) => (
+  <section>
+    <h2>{state}</h2>
+
+    <ul>
+      {metros.map((m) => (
+        <li>
+          <a href={`/en/plumbing/${m.slug}/`}>
+            Plumbing Services in {m.city}, {state}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+))}
+
+</BaseLayout>

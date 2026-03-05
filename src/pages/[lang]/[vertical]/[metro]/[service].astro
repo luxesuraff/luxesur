@@ -1,0 +1,227 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import CallCTA from "@/components/CallCTA.astro";
+import RelatedMetros from "@/components/RelatedMetros.astro";
+
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+export async function getStaticPaths() {
+
+  const { data: metros } = await supabase
+    .from("metros")
+    .select("slug")
+    .eq("is_active", true);
+
+  const services = [
+    "emergency-plumbing",
+    "burst-pipe",
+    "no-hot-water",
+    "sewer-backup"
+  ];
+
+  const languages = ["en","es"];
+
+  const paths = [];
+
+  for (const lang of languages) {
+    for (const m of metros || []) {
+      for (const s of services) {
+
+        paths.push({
+          params: {
+            lang,
+            vertical: "emergency-plumbing",
+            metro: m.slug,
+            service: s
+          }
+        });
+
+      }
+    }
+  }
+
+  return paths;
+}
+
+const { lang, service, metro } = Astro.params;
+
+/* metro data */
+
+const { data: metroData } = await supabase
+  .from("metros")
+  .select("name,state,region_name")
+  .eq("slug", metro)
+  .single();
+
+const city = metroData.name;
+const state = metroData.state;
+const region = metroData.region_name;
+
+/* service titles */
+
+const serviceNames = {
+  "emergency-plumbing":"Emergency Plumbing",
+  "burst-pipe":"Burst Pipe Repair",
+  "no-hot-water":"No Hot Water Repair",
+  "sewer-backup":"Sewer Backup Service"
+};
+
+const serviceTitle = serviceNames[service];
+
+/* hero images */
+
+const heroImages = {
+  "emergency-plumbing":"/images/emergency-plumbing/emergency/hero.webp",
+  "burst-pipe":"/images/emergency-plumbing/burst-pipe/hero.webp",
+  "no-hot-water":"/images/emergency-plumbing/no-hot-water/hero.webp",
+  "sewer-backup":"/images/emergency-plumbing/sewer-backup/hero.webp"
+};
+
+const heroImage = heroImages[service];
+
+/* SEO */
+
+const pageTitle = `${serviceTitle} in ${city}, ${state} | Luxesur`;
+
+const canonicalUrl =
+`${SITE_URL}/${lang}/emergency-plumbing/${metro}/${service}/`;
+
+/* FAQ content */
+
+const faqItems = [
+
+{
+question:`How quickly can ${serviceTitle.toLowerCase()} be handled in ${city}?`,
+answer:`Response times vary depending on provider availability, but service may be available in ${city} and surrounding areas of ${region}.`
+},
+
+{
+question:`Is ${serviceTitle.toLowerCase()} available after hours in ${city}?`,
+answer:`Some independent service providers may offer emergency or after-hours service depending on availability.`
+},
+
+{
+question:`Do plumbing professionals in ${city} service nearby communities?`,
+answer:`Yes, services may extend to nearby neighborhoods and surrounding cities in the ${region} region.`
+}
+
+];
+
+/* SERVICE SCHEMA */
+
+const serviceSchema = {
+"@context":"https://schema.org",
+"@type":"Service",
+"name":`${serviceTitle} in ${city}, ${state}`,
+"areaServed":{
+"@type":"City",
+"name":city
+},
+"provider":{
+"@type":"Organization",
+"name":"Luxesur",
+"url":SITE_URL
+}
+};
+
+/* LOCAL BUSINESS SCHEMA */
+
+const businessSchema = {
+"@context":"https://schema.org",
+"@type":"LocalBusiness",
+"name":"Luxesur",
+"url":SITE_URL,
+"areaServed":{
+"@type":"City",
+"name":city
+}
+};
+
+/* BREADCRUMB SCHEMA */
+
+const breadcrumbSchema = {
+"@context":"https://schema.org",
+"@type":"BreadcrumbList",
+"itemListElement":[
+{
+"@type":"ListItem",
+"position":1,
+"name":"Home",
+"item":SITE_URL
+},
+{
+"@type":"ListItem",
+"position":2,
+"name":"Plumbing",
+"item":`${SITE_URL}/${lang}/emergency-plumbing/`
+},
+{
+"@type":"ListItem",
+"position":3,
+"name":city,
+"item":`${SITE_URL}/${lang}/emergency-plumbing/${metro}/`
+},
+{
+"@type":"ListItem",
+"position":4,
+"name":serviceTitle,
+"item":canonicalUrl
+}
+]
+};
+
+---
+
+<BaseLayout
+title={pageTitle}
+canonical={canonicalUrl}
+lang={lang}
+faqs={faqItems}
+>
+
+<script type="application/ld+json" set:html={JSON.stringify(serviceSchema)} />
+<script type="application/ld+json" set:html={JSON.stringify(businessSchema)} />
+<script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
+
+<Hero
+src={heroImage}
+alt={`${serviceTitle} in ${city}, ${state}`}
+>
+
+<CallCTA label="Call Now" />
+
+</Hero>
+
+<h1>{serviceTitle} in {city}, {state}</h1>
+
+<p>
+{serviceTitle} services may be available in {city} and surrounding areas
+throughout the {region} region.
+</p>
+
+<a href={`/${lang}/emergency-plumbing/${metro}/`}>
+← Back to {city} Plumbing Services
+</a>
+
+<section>
+
+<h2>Frequently Asked Questions</h2>
+
+{faqItems.map((faq)=> (
+
+<div>
+
+<h3>{faq.question}</h3>
+
+<p>{faq.answer}</p>
+
+</div>
+
+))}
+
+</section>
+
+</BaseLayout>

@@ -1,15 +1,51 @@
 ---
-import Pixels from "../components/Pixels.astro";
+import Pixels from "@/components/Pixels.astro";
+import { Astro } from "astro";
 
-const { title, breadcrumbs = null, faqs = null } = Astro.props;
+const {
+  title,
+  breadcrumbs = null,
+  faqs = null,
+  canonical = null,
+  hreflang = null,
+  lang = "en"
+} = Astro.props;
+
+/* =========================
+   CANONICAL LOGIC
+========================= */
+
+const canonicalUrl =
+  canonical ??
+  new URL(Astro.request.url).origin + Astro.url.pathname;
 ---
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang={lang}>
   <head>
     <title>{title}</title>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- SEO META -->
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <!-- CANONICAL -->
+    <link rel="canonical" href={canonicalUrl} />
+
+    <!-- HREFLANG -->
+    {hreflang?.en && (
+      <link rel="alternate" hrefLang="en" href={hreflang.en} />
+    )}
+
+    {hreflang?.es && (
+      <link rel="alternate" hrefLang="es" href={hreflang.es} />
+    )}
+
+    {hreflang?.xDefault && (
+      <link rel="alternate" hrefLang="x-default" href={hreflang.xDefault} />
+    )}
 
     <!-- GOOGLE TAG (GA4) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMDPYFW90C"></script>
@@ -20,7 +56,7 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
       gtag('config', 'G-ZMDPYFW90C');
     </script>
 
-    <!-- SITE-WIDE SCHEMA -->
+    <!-- WEBSITE SCHEMA -->
     <script type="application/ld+json">
       {JSON.stringify({
         "@context": "https://schema.org",
@@ -28,7 +64,7 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
         name: "Luxesur",
         url: "https://www.luxesur.com",
         description:
-          "Luxesur is a consumer-facing informational and referral platform that helps users find assistance for emergency plumbing situations through independent third-party service providers.",
+          "Luxesur is a consumer-facing informational and referral platform connecting users with independent third-party service providers.",
         publisher: {
           "@type": "Organization",
           name: "Luxesur",
@@ -37,7 +73,7 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
       })}
     </script>
 
-    <!-- ORGANIZATION SCHEMA (NO PHONE DURING BAKE) -->
+    <!-- ORGANIZATION SCHEMA -->
     <script type="application/ld+json">
       {JSON.stringify({
         "@context": "https://schema.org",
@@ -45,11 +81,11 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
         name: "Luxesur",
         url: "https://www.luxesur.com",
         description:
-          "Luxesur operates as an informational and referral platform connecting users with independent emergency plumbing service providers.",
+          "Luxesur operates as an informational and referral platform.",
       })}
     </script>
 
-    <!-- OPTIONAL FAQ SCHEMA -->
+    <!-- FAQ SCHEMA -->
     {faqs && (
       <script
         type="application/ld+json"
@@ -68,7 +104,7 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
       />
     )}
 
-    <!-- OPTIONAL BREADCRUMB SCHEMA -->
+    <!-- BREADCRUMB SCHEMA -->
     {breadcrumbs && (
       <script
         type="application/ld+json"
@@ -85,7 +121,7 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
       />
     )}
 
-    <!-- PIXELS (OFF BY DEFAULT) -->
+    <!-- PIXELS -->
     <Pixels />
 
     <style>
@@ -101,6 +137,16 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
         max-width: 900px;
         margin: 40px auto;
         padding: 0 20px;
+      }
+
+      nav.breadcrumbs {
+        font-size: 14px;
+        margin-bottom: 20px;
+        color: #666;
+      }
+
+      nav.breadcrumbs a {
+        color: #0b5ed7;
       }
 
       footer {
@@ -119,21 +165,50 @@ const { title, breadcrumbs = null, faqs = null } = Astro.props;
       a:hover {
         text-decoration: underline;
       }
+
+      .geo-hub {
+        margin-top: 30px;
+        font-size: 14px;
+      }
     </style>
   </head>
 
   <body>
+
     <main>
+
+      <!-- HTML BREADCRUMBS (CRAWLABLE LINKS) -->
+      {breadcrumbs && (
+        <nav class="breadcrumbs">
+          {breadcrumbs.map((b, i) => (
+            <>
+              <a href={b.url}>{b.name}</a>
+              {i < breadcrumbs.length - 1 && " > "}
+            </>
+          ))}
+        </nav>
+      )}
+
       <slot />
+
+      <!-- GEO DISCOVERY LINKS -->
+      <div class="geo-hub">
+        <strong>Service Areas</strong><br />
+        <a href="/cities/">Cities We Serve</a>
+      </div>
+
     </main>
 
     <footer>
       <a href="/">Home</a> |
+      <a href="/cities/">Cities</a> |
       <a href="/about">About</a> |
       <a href="/contact">Contact</a> |
       <a href="/disclosures">Disclosures</a> |
       <a href="/privacy">Privacy</a> |
       <a href="/terms">Terms</a>
+      <a href="/crawl-map/">Coverage Map</a>
     </footer>
+
   </body>
 </html>

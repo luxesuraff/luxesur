@@ -1,0 +1,57 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL,
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+);
+
+const { data: metros } = await supabase
+  .from("metros")
+  .select("city, slug, state")
+  .eq("active", true)
+  .order("state", { ascending: true })
+  .order("city", { ascending: true });
+
+const intents = [
+  { slug: "emergency-plumbing", label: "Emergency Plumbing" },
+  { slug: "burst-pipe", label: "Burst Pipe Repair" },
+  { slug: "no-hot-water", label: "No Hot Water Repair" },
+  { slug: "sewer-backup", label: "Sewer Backup Service" }
+];
+---
+
+<BaseLayout
+  title="Service Coverage Map | Luxesur"
+  brand="Luxesur"
+  domain="https://www.luxesur.com"
+>
+
+<h1>Service Coverage Map</h1>
+
+<p>
+This page lists all service areas and plumbing services available through Luxesur.
+</p>
+
+{metros.map((metro) => (
+  <section>
+
+    <h2>
+      Plumbing Services in {metro.city}, {metro.state}
+    </h2>
+
+    <ul>
+      {intents.map((intent) => (
+        <li>
+          <a href={`/en/plumbing/${metro.slug}/${intent.slug}/`}>
+            {intent.label} in {metro.city}
+          </a>
+        </li>
+      ))}
+    </ul>
+
+  </section>
+))}
+
+</BaseLayout>

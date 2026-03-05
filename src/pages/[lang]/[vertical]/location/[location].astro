@@ -1,0 +1,149 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Hero from "../../components/Hero.astro";
+import CallCTA from "../../components/CallCTA.astro";
+import { supabase } from "../../lib/supabase";
+import { VERTICALS } from "../../config/verticals";
+
+/* ---------------------------------------
+   STATIC PATHS (Build-time generation)
+--------------------------------------- */
+export async function getStaticPaths() {
+  const { data: locations, error } = await supabase
+    .from("locations")
+    .select("slug")
+    .eq("is_active", true);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const verticals = Object.keys(VERTICALS);
+  const paths = [];
+
+  for (const v of verticals) {
+    for (const loc of locations || []) {
+      paths.push({
+        params: {
+          vertical: v,
+          location: loc.slug,
+        },
+      });
+    }
+  }
+
+  return paths;
+}
+
+/* ---------------------------------------
+   PAGE DATA
+--------------------------------------- */
+const { vertical, location } = Astro.params;
+
+if (!VERTICALS[vertical]) {
+  throw new Error(`Invalid vertical: ${vertical}`);
+}
+
+const { data: locationData, error } = await supabase
+  .from("locations")
+  .select("*")
+  .eq("slug", location)
+  .single();
+
+if (error || !locationData) {
+  throw new Error(`Location not found: ${location}`);
+}
+
+const config = VERTICALS[vertical];
+const isMetro = locationData.type === "metro";
+
+const pageTitle = `${config.label} in ${locationData.name}, ${locationData.state_abbr}`;
+const metaDescription = `24/7 ${config.label.toLowerCase()} in ${locationData.name}, ${locationData.state_abbr}. Immediate emergency service available.`;
+---
+
+<BaseLayout title={pageTitle} description={metaDescription}>
+
+  {/* HERO */}
+  <Hero
+    title={`${config.label} in ${locationData.name}, ${locationData.state_abbr}`}
+    subtitle="24/7 Emergency Service"
+    intent={`${vertical}-emergency`}
+  />
+
+  {/* PRIMARY SERVICE SECTION */}
+  <section>
+    <h2>24/7 ${config.label}</h2>
+    <p>
+      Immediate response for urgent ${vertical} problems in {locationData.name}.
+      Fast service helps reduce damage and restore safety.
+    </p>
+    <CallCTA intent={`${vertical}-emergency`} />
+  </section>
+
+  {/* VERTICAL-SPECIFIC CONTENT */}
+
+  {vertical === "plumbing" && (
+    <>
+      <section>
+        <h3>Burst Pipe Repair</h3>
+        <p>Emergency response for burst pipes and active leaks.</p>
+        <CallCTA intent="plumbing-emergency" />
+      </section>
+
+      <section>
+        <h3>No Hot Water</h3>
+        <p>Immediate water heater troubleshooting and repair.</p>
+        <CallCTA intent="plumbing-emergency" />
+      </section>
+
+      <section>
+        <h3>Sewer Backup</h3>
+        <p>Sewer backups require urgent professional attention.</p>
+        <CallCTA intent="plumbing-sewer-backup" />
+      </section>
+    </>
+  )}
+
+  {vertical === "hvac" && (
+    <>
+      <section>
+        <h3>Emergency AC Repair</h3>
+        <p>Fast cooling system repair when your AC stops working.</p>
+        <CallCTA intent="hvac-ac-repair" />
+      </section>
+
+      <section>
+        <h3>Emergency Heating Repair</h3>
+        <p>Immediate heating repair during cold weather failures.</p>
+        <CallCTA intent="hvac-heating-repair" />
+      </section>
+    </>
+  )}
+
+  {vertical === "electrical" && (
+    <section>
+      <h3>Power Outage & Electrical Emergencies</h3>
+      <p>Urgent electrical repair for outages and safety hazards.</p>
+      <CallCTA intent="electrical-power-outage" />
+    </section>
+  )}
+
+  {/* METRO-ONLY INTENT DEPTH LINKS */}
+  {isMetro && (
+    <section>
+      <h3>More ${config.label} Services in {locationData.name}</h3>
+      <ul>
+        {config.intents
+          .filter((intent) => intent !== config.primaryIntent)
+          .map((intent) => (
+            <li>
+              <a href={`/${vertical}/${location}/${intent}`}>
+                {intent.replace("-", " ")}
+              </a>
+            </li>
+          ))}
+      </ul>
+    </section>
+  )}
+
+</BaseLayout>

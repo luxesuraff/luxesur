@@ -1,60 +1,107 @@
 import type { APIRoute } from "astro";
-import { cities } from "../data/cities";
+import { supabase } from "../lib/supabase";
 
 const SITE_URL = "https://www.luxesur.com";
 
-// Static pages
-const staticPages = [
-  "/",
-  "/about",
-  "/contact",
-  "/disclosures",
-  "/privacy",
-  "/terms",
-  "/emergency-plumbing",
-];
-
 export const GET: APIRoute = async () => {
+
   const urls: string[] = [];
 
-  // Add static pages
-  for (const path of staticPages) {
-    urls.push(`${SITE_URL}${path}/`);
+  /* =========================
+     STATIC PAGES
+  ========================= */
+  const staticPages = [
+    { path: "", priority: "1.0" },
+    { path: "/about", priority: "0.6" },
+    { path: "/contact", priority: "0.6" },
+    { path: "/disclosures", priority: "0.4" },
+    { path: "/privacy", priority: "0.3" },
+    { path: "/terms", priority: "0.3" }
+  ];
+
+  for (const page of staticPages) {
+    urls.push(`
+      <url>
+        <loc>${SITE_URL}${page.path}/</loc>
+        <lastmod>${new Date().toISOString()}</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>${page.priority}</priority>
+      </url>
+    `);
   }
 
-  // Add city pages for each intent
-  for (const city of cities) {
-    const slug = city.slug;
+  /* =========================
+     FETCH VERTICALS
+  ========================= */
+  const { data: verticals } = await supabase
+    .from("verticals")
+    .select("slug");
 
-    // Base emergency plumbing city page
-    urls.push(`${SITE_URL}/emergency-plumbing/${slug}/`);
+  /* =========================
+     FETCH METROS
+  ========================= */
+  const { data: metros } = await supabase
+    .from("metros")
+    .select("slug")
+    .eq("is_active", true);
 
-    // Burst pipe
-    urls.push(
-      `${SITE_URL}/emergency-plumbing/burst-pipe/${slug}/`
-    );
+  /* =========================
+     FETCH PAGE BUILD LOG
+     (For lastmod accuracy)
+  ========================= */
+  const { data: buildLog } = await supabase
+    .from("page_build_log")
+    .select("metro_slug, vertical_slug, language_code, updated_at");
 
-    // Sewer backup
-    urls.push(
-      `${SITE_URL}/emergency-plumbing/sewer-backup/${slug}/`
-    );
+  const buildMap = new Map(
+    (buildLog || []).map(entry => [
+      `${entry.language_code}-${entry.vertical_slug}-${entry.metro_slug}`,
+      entry.updated_at
+    ])
+  );
 
-    // No hot water
-    urls.push(
-      `${SITE_URL}/emergency-plumbing/no-hot-water/${slug}/`
-    );
+  const languages = ["en", "es"];
+
+  /* =========================
+     BUILD DYNAMIC URLS
+  ========================= */
+  for (const lang of languages) {
+    for (const v of verticals || []) {
+
+      /* Vertical root page */
+      urls.push(`
+        <url>
+          <loc>${SITE_URL}/${lang}/${v.slug}/</loc>
+          <lastmod>${new Date().toISOString()}</lastmod>
+          <changefreq>weekly</changefreq>
+          <priority>0.9</priority>
+        </url>
+      `);
+
+      /* Metro pages */
+      for (const m of metros || []) {
+
+        const key = `${lang}-${v.slug}-${m.slug}`;
+        const lastmod = buildMap.get(key) || new Date().toISOString();
+
+        urls.push(`
+          <url>
+            <loc>${SITE_URL}/${lang}/${v.slug}/${m.slug}/</loc>
+            <lastmod>${new Date(lastmod).toISOString()}</lastmod>
+            <changefreq>weekly</changefreq>
+            <priority>0.8</priority>
+          </url>
+        `);
+      }
+    }
   }
 
+  /* =========================
+     GENERATE XML
+  ========================= */
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls
-  .map(
-    (url) => `
-  <url>
-    <loc>${url}</loc>
-  </url>`
-  )
-  .join("")}
+${urls.join("")}
 </urlset>`;
 
   return new Response(xml, {

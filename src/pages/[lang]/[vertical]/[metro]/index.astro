@@ -1,0 +1,355 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import CallCTA from "@/components/CallCTA.astro";
+import RelatedMetros from "@/components/RelatedMetros.astro";
+
+import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+STATIC PATHS
+========================= */
+
+export async function getStaticPaths() {
+
+  const { data: metros } = await supabase
+    .from("metros")
+    .select("slug")
+    .eq("is_active", true);
+
+  const { data: verticals } = await supabase
+    .from("verticals")
+    .select("slug");
+
+  const languages = ["en","es"];
+
+  const paths = [];
+
+  for (const lang of languages) {
+    for (const v of verticals || []) {
+      for (const m of metros || []) {
+
+        paths.push({
+          params: {
+            lang,
+            vertical: v.slug,
+            metro: m.slug
+          }
+        });
+
+      }
+    }
+  }
+
+  return paths;
+}
+
+const { lang, vertical, metro } = Astro.params;
+
+if (!["en","es"].includes(lang)) {
+  throw new Error("Invalid language");
+}
+
+/* =========================
+VERTICAL DATA
+========================= */
+
+const { data: verticalData } = await supabase
+  .from("verticals")
+  .select("id,name,hero_image")
+  .eq("slug", vertical)
+  .single();
+
+if (!verticalData) throw new Error("Invalid vertical");
+
+/* =========================
+METRO DATA
+========================= */
+
+const { data: metroData } = await supabase
+  .from("metros")
+  .select("name,state,region_name")
+  .eq("slug", metro)
+  .single();
+
+if (!metroData) throw new Error("Metro not found");
+
+const city = metroData.name;
+const state = metroData.state;
+const region = metroData.region_name;
+
+/* =========================
+RELATED METROS
+========================= */
+
+const { data } = await supabase
+  .from("metros")
+  .select("name,slug")
+  .eq("state", state)
+  .neq("slug", metro)
+  .limit(6);
+
+const relatedMetros = data || [];
+
+/* =========================
+PAGE BUILD LOG
+========================= */
+
+await supabaseAdmin
+  .from("page_build_log")
+  .upsert(
+    {
+      metro_slug: metro,
+      vertical_slug: vertical,
+      language_code: lang,
+      updated_at: new Date().toISOString()
+    },
+    {
+      onConflict: "metro_slug,vertical_slug,language_code"
+    }
+  );
+
+/* =========================
+CANONICAL + HREFLANG
+========================= */
+
+const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/`;
+
+const alternateEn = `${SITE_URL}/en/${vertical}/${metro}/`;
+const alternateEs = `${SITE_URL}/es/${vertical}/${metro}/`;
+
+/* =========================
+FAQ
+========================= */
+
+let faqItems = [];
+
+const { data: faqSet } = await supabase
+  .from("faq_sets")
+  .select("id")
+  .eq("slug", `${vertical}-core`)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (faqSet?.id) {
+
+  const { data } = await supabase
+    .from("faq_items")
+    .select("question,answer,position")
+    .eq("faq_set_id", faqSet.id)
+    .eq("is_active", true)
+    .order("position");
+
+  faqItems = data || [];
+}
+
+/* =========================
+CTA CONTROL
+========================= */
+
+let callsEnabled = false;
+let phoneNumber = null;
+
+let ctaLabel = lang === "es" ? "Llamar Ahora" : "Call Now";
+let ctaSubtext = lang === "es" ? "Servicio 24/7" : "24/7 Service";
+
+const { data: ctaSettings } = await supabase
+  .from("vertical_cta_settings")
+  .select("calls_enabled")
+  .eq("vertical_id", verticalData.id)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+callsEnabled = ctaSettings?.calls_enabled ?? false;
+
+if (callsEnabled) {
+
+  const { data: ctaProfile } = await supabase
+    .from("cta_profiles")
+    .select("phone_number,cta_label,cta_subtext,is_active")
+    .eq("vertical_id", verticalData.id)
+    .eq("language_code", lang)
+    .maybeSingle();
+
+  if (ctaProfile?.is_active && ctaProfile?.phone_number) {
+
+    phoneNumber = ctaProfile.phone_number;
+
+    ctaLabel = ctaProfile.cta_label ?? ctaLabel;
+    ctaSubtext = ctaProfile.cta_subtext ?? ctaSubtext;
+  }
+}
+
+/* =========================
+SEO TITLE
+========================= */
+
+const pageTitle =
+  lang === "es"
+    ? `${verticalData.name} en ${city}, ${state} | Luxesur`
+    : `${verticalData.name} in ${city}, ${state} | Luxesur`;
+
+/* =========================
+HERO IMAGE
+========================= */
+
+const heroImage = `/images/emergency-plumbing/emergency/hero.webp`;
+
+/* =========================
+SCHEMA
+========================= */
+
+const serviceSchema = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: `${verticalData.name} ${lang==="es"?"en":"in"} ${city}, ${state}`,
+  areaServed: {
+    "@type": "City",
+    name: city
+  },
+  provider: {
+    "@type": "Organization",
+    name: "Luxesur",
+    url: SITE_URL
+  }
+};
+
+const breadcrumbSchema = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    {
+      "@type": "ListItem",
+      position: 1,
+      name: "Home",
+      item: SITE_URL
+    },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: verticalData.name,
+      item: `${SITE_URL}/${lang}/${vertical}/`
+    },
+    {
+      "@type": "ListItem",
+      position: 3,
+      name: city,
+      item: canonicalUrl
+    }
+  ]
+};
+---
+
+<BaseLayout
+  title={pageTitle}
+  canonical={canonicalUrl}
+  hreflang={{
+    en: alternateEn,
+    es: alternateEs,
+    xDefault: alternateEn
+  }}
+  lang={lang}
+  faqs={faqItems}
+>
+
+<script type="application/ld+json" set:html={JSON.stringify(serviceSchema)} />
+<script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
+
+<Hero
+  src={heroImage}
+  alt={`${verticalData.name} ${lang==="es"?"en":"in"} ${city}, ${state}`}
+>
+
+<CallCTA
+  phoneNumber={callsEnabled ? phoneNumber : null}
+  label={ctaLabel}
+  subtext={ctaSubtext}
+  className="hero-cta"
+/>
+
+</Hero>
+
+<h1>{pageTitle}</h1>
+
+<p>
+{lang==="es"
+? `${verticalData.name} puede estar disponible en ${city} y áreas cercanas dentro de la región ${region}.`
+: `${verticalData.name} services may be available in ${city} and surrounding areas throughout the ${region} region.`}
+</p>
+
+<h2>{lang==="es" ? "Servicios Disponibles" : "Available Services"}</h2>
+
+<ul>
+
+<li>
+<a href={`/${lang}/${vertical}/${metro}/emergency-plumbing/`}>
+Emergency Plumbing
+</a>
+</li>
+
+<li>
+<a href={`/${lang}/${vertical}/${metro}/burst-pipe/`}>
+Burst Pipe Repair
+</a>
+</li>
+
+<li>
+<a href={`/${lang}/${vertical}/${metro}/no-hot-water/`}>
+No Hot Water Repair
+</a>
+</li>
+
+<li>
+<a href={`/${lang}/${vertical}/${metro}/sewer-backup/`}>
+Sewer Backup Service
+</a>
+</li>
+
+</ul>
+
+{faqItems.length > 0 && (
+
+<section>
+
+<h2>
+{lang==="es"
+? "Preguntas Frecuentes"
+: "Frequently Asked Questions"}
+</h2>
+
+{faqItems.map((faq) => (
+
+<div>
+<h3>{faq.question}</h3>
+<p>{faq.answer}</p>
+</div>
+
+))}
+
+</section>
+
+)}
+
+<RelatedMetros
+  metros={relatedMetros}
+  lang={lang}
+  vertical={vertical}
+/>
+
+{callsEnabled && phoneNumber && (
+
+<div class="sticky-cta">
+
+<CallCTA
+phoneNumber={phoneNumber}
+label={ctaLabel}
+/>
+
+</div>
+
+)}
+
+</BaseLayout>

@@ -1,0 +1,29 @@
+---
+type Props = {
+  metros?: { name: string; slug: string }[];
+  lang: string;
+  vertical: string;
+};
+
+const { metros = [], lang, vertical } = Astro.props;
+---
+
+{metros.length > 0 && (
+  <section class="related-metros">
+
+    <h2>
+      {lang === "es" ? "Ciudades Cercanas" : "Nearby Cities"}
+    </h2>
+
+    <ul>
+      {metros.map((m) => (
+        <li>
+          <a href={`/${lang}/${vertical}/${m.slug}/`}>
+            {m.name}
+          </a>
+        </li>
+      ))}
+    </ul>
+
+  </section>
+)}

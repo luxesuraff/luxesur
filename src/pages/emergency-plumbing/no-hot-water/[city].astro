@@ -1,8 +1,8 @@
 ---
-import BaseLayout from "../../../layouts/BaseLayout.astro";
-import { cities } from "../../../data/cities";
-import { INTENT_CONFIG, type IntentKey } from "../../../config/intents";
-import Hero from "../../../components/Hero.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { cities } from "@/data/cities";
+import { INTENT_CONFIG, type IntentKey } from "@/config/intents";
+import Hero from "@/components/Hero.astro";
 
 export async function getStaticPaths() {
   return cities.map((city) => ({
@@ -23,6 +23,11 @@ const intentConfig = INTENT_CONFIG[intent];
 const pageTitle = `No Hot Water Repair in ${cityName}, ${state} | Emergency Plumbing Help`;
 const metaDescription =
   `No hot water in ${cityName}, ${state}? Get emergency plumbing help for water heater failures and sudden loss of hot water.`;
+const currentIndex = cities.findIndex(c => c.slug === city.slug);
+
+const nearbyCities = cities
+  .slice(currentIndex + 1, currentIndex + 7)
+  .filter(Boolean);
 ---
 <BaseLayout title={pageTitle} description={metaDescription}>
 
@@ -151,5 +156,17 @@ const metaDescription =
       </a>
     )}
   </section>
+<section class="nearby-cities">
+  <h2>Nearby Service Areas</h2>
+  <ul>
+    {nearbyCities.map((c) => (
+      <li>
+        <a href={`/emergency-plumbing/no-hot-water/${c.slug}/`}>
+          No Hot Water in {c.city}, {c.state}
+        </a>
+      </li>
+    ))}
+  </ul>
+</section>
 
 </BaseLayout>

@@ -1,0 +1,420 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import CallCTA from "@/components/CallCTA.astro";
+
+import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+HELPERS
+========================= */
+
+function injectLocation(text, city, state) {
+  if (!text) return "";
+
+  return text
+    .replaceAll("{city}", city)
+    .replaceAll("{state}", state);
+}
+
+function formatHeading(text) {
+  if (!text) return "";
+
+  return text
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, l => l.toUpperCase());
+}
+
+/* =========================
+STATIC PATHS
+========================= */
+
+export async function getStaticPaths() {
+
+  const { data: metros } = await supabaseAdmin
+    .from("metros")
+    .select("slug,city,state")
+    .eq("active", true);
+
+  const { data: verticals } = await supabaseAdmin
+    .from("verticals")
+    .select("slug");
+
+  const { data: services } = await supabaseAdmin
+    .from("intents")
+    .select("slug,vertical_slug")
+    .eq("is_active", true);
+
+  const languages = ["en","es"];
+  const paths = [];
+
+  for (const lang of languages) {
+
+    for (const v of verticals || []) {
+
+      for (const m of metros || []) {
+
+        const serviceList = (services || []).filter(
+          s => s.vertical_slug === v.slug
+        );
+
+        for (const s of serviceList) {
+
+          paths.push({
+            params: {
+              lang,
+              vertical: v.slug,
+              metro: m.slug,
+              service: s.slug
+            },
+            props: {
+              city: m.city,
+              state: m.state
+            }
+          });
+
+        }
+
+      }
+
+    }
+
+  }
+
+  return paths;
+
+}
+
+/* =========================
+PARAMS
+========================= */
+
+const { lang, vertical, metro, service } = Astro.params;
+const { city, state } = Astro.props;
+
+/* =========================
+VERTICAL DATA
+========================= */
+
+const { data: verticalData } = await supabase
+  .from("verticals")
+  .select("id,name,hero_image")
+  .eq("slug", vertical)
+  .maybeSingle();
+
+if (!verticalData) {
+  throw new Error("Vertical not found");
+}
+
+/* =========================
+SERVICE DATA
+========================= */
+
+const { data: serviceData } = await supabase
+  .from("intents")
+  .select("name")
+  .eq("slug", service)
+  .maybeSingle();
+
+if (!serviceData) {
+  throw new Error("Service not found");
+}
+
+/* =========================
+CONTENT BLOCKS
+========================= */
+
+const { data: contentBlocks } = await supabase
+  .from("intent_content_blocks")
+  .select("*")
+  .eq("intent_slug", service)
+  .eq("language_code", lang)
+  .order("position");
+
+const blocks = contentBlocks || [];
+
+const uniqueBlocks = [];
+const seenSections = new Set();
+
+for (const b of blocks) {
+
+  const section = (b.section || b.heading || "").toLowerCase().trim();
+  const content = b.content || b.body || "";
+
+  if (!section || !content) continue;
+  if (seenSections.has(section)) continue;
+
+  seenSections.add(section);
+
+  uniqueBlocks.push({
+    section,
+    content
+  });
+
+}
+
+const finalBlocks = uniqueBlocks.slice(0,12);
+
+/* =========================
+FAQ
+========================= */
+
+let faqItems = [];
+
+const { data: faqSet } = await supabase
+  .from("faq_sets")
+  .select("id")
+  .eq("slug", `${service}-core`)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (faqSet?.id) {
+
+  const { data: faqData } = await supabase
+    .from("faq_items")
+    .select("question,answer,position")
+    .eq("faq_set_id", faqSet.id)
+    .order("position");
+
+  faqItems = faqData || [];
+
+}
+
+/* =========================
+CTA
+========================= */
+
+let phoneNumber = null;
+
+const { data: ctaSettings } = await supabase
+  .from("vertical_cta_settings")
+  .select("calls_enabled")
+  .eq("vertical_id", verticalData.id)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (ctaSettings?.calls_enabled) {
+
+  const { data: ctaProfile } = await supabase
+    .from("cta_profiles")
+    .select("phone_number,is_active")
+    .eq("vertical_id", verticalData.id)
+    .eq("language_code", lang)
+    .maybeSingle();
+
+  if (ctaProfile?.is_active) {
+    phoneNumber = ctaProfile.phone_number;
+  }
+
+}
+
+/* =========================
+SUBURBS
+========================= */
+
+let suburbs = [];
+
+const { data: suburbData } = await supabase
+  .from("suburbs")
+  .select("name,slug")
+  .eq("metro_slug", metro)
+  .limit(20);
+
+suburbs = suburbData || [];
+
+/* =========================
+RELATED SERVICES
+========================= */
+
+let relatedServices = [];
+
+const { data: otherServices } = await supabase
+  .from("intents")
+  .select("slug,name")
+  .eq("vertical_slug", vertical)
+  .neq("slug", service)
+  .eq("is_active", true);
+
+relatedServices = otherServices || [];
+
+/* =========================
+SEO
+========================= */
+
+const pageTitle =
+`${serviceData.name} in ${city}, ${state} | Luxesur`;
+
+const metaDescription =
+`${serviceData.name} services in ${city}, ${state}. Fast response coverage for plumbing emergencies including burst pipes, sewer backups, and water heater failures.`;
+
+const canonicalUrl =
+`${SITE_URL}/${lang}/${vertical}/${metro}/${service}/`;
+
+const heroImage =
+verticalData.hero_image || "/images/default.webp";
+
+/* =========================
+SCHEMA
+========================= */
+
+const serviceSchema = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: `${serviceData.name} in ${city}, ${state}`,
+  areaServed: {
+    "@type": "City",
+    name: city
+  },
+  provider: {
+    "@type": "Organization",
+    name: "Luxesur",
+    url: SITE_URL
+  }
+};
+---
+
+<BaseLayout
+title={pageTitle}
+description={metaDescription}
+canonical={canonicalUrl}
+lang={lang}
+faqs={faqItems}
+>
+
+<script type="application/ld+json" set:html={JSON.stringify(serviceSchema)} />
+
+<Hero
+src={heroImage}
+alt={`${serviceData.name} in ${city}, ${state}`}
+>
+
+<CallCTA phoneNumber={phoneNumber} />
+
+</Hero>
+
+<h1>{serviceData.name} in {city}, {state}</h1>
+
+<p>
+{serviceData.name} services may be available in {city}, {state}.
+</p>
+
+{finalBlocks.map((b) => (
+
+<section>
+
+<h2>{formatHeading(b.section)}</h2>
+
+<p>{injectLocation(b.content, city, state)}</p>
+
+</section>
+
+))}
+
+{/* =========================
+SUBURB DISCOVERY
+========================= */}
+
+{suburbs.length > 0 && (
+
+<section>
+
+<h2>
+{lang === "es"
+  ? `Áreas cercanas en ${city}`
+  : `Nearby Service Areas in ${city}`}
+</h2>
+
+<ul>
+
+{suburbs.map((s) => (
+
+<li>
+<a href={`/${lang}/${vertical}/${metro}/${service}/${s.slug}/`}>
+{s.name}
+</a>
+</li>
+
+))}
+
+</ul>
+
+</section>
+
+)}
+
+{/* =========================
+RELATED SERVICES
+========================= */}
+
+{relatedServices.length > 0 && (
+
+<section>
+
+<h2>
+{lang === "es"
+  ? "Otros servicios"
+  : "Other Services"}
+</h2>
+
+<ul>
+
+{relatedServices.map((s) => (
+
+<li>
+
+<a href={`/${lang}/${vertical}/${metro}/${s.slug}/`}>
+{s.name} in {city}
+</a>
+
+</li>
+
+))}
+
+</ul>
+
+</section>
+
+)}
+
+{/* =========================
+GEO FOOTER NAV
+========================= */}
+
+<footer>
+
+<nav>
+
+<h3>
+{lang === "es" ? "Explorar" : "Explore"}
+</h3>
+
+<ul>
+
+<li>
+<a href={`/${lang}/cities/`}>
+{lang === "es" ? "Ciudades" : "Cities"}
+</a>
+</li>
+
+<li>
+<a href={`/${lang}/services/`}>
+{lang === "es" ? "Servicios" : "Services"}
+</a>
+</li>
+
+<li>
+<a href="/crawl-map/">
+{lang === "es" ? "Mapa de cobertura" : "Coverage Map"}
+</a>
+</li>
+
+</ul>
+
+</nav>
+
+</footer>
+
+</BaseLayout>

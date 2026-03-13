@@ -1,0 +1,34 @@
+---
+const { lang = "en" } = Astro.props;
+const isSpanish = lang === "es";
+---
+
+<footer class="footer-geo-nav">
+  <div>
+    <h3>{isSpanish ? "Explorar" : "Explore"}</h3>
+    <ul>
+      <li><a href={`/${lang}/cities/`}>{isSpanish ? "Ciudades" : "Cities"}</a></li>
+      <li><a href={`/${lang}/services/`}>{isSpanish ? "Servicios" : "Services"}</a></li>
+      <li><a href="/crawl-map/">{isSpanish ? "Mapa del sitio" : "Coverage Map"}</a></li>
+    </ul>
+  </div>
+
+  <div>
+    <h3>{isSpanish ? "Estados" : "States"}</h3>
+    <ul>
+      <li><a href={`/${lang}/florida/`}>Florida</a></li>
+      <li><a href={`/${lang}/texas/`}>Texas</a></li>
+      <li><a href={`/${lang}/california/`}>California</a></li>
+      <li><a href={`/${lang}/new-york/`}>New York</a></li>
+    </ul>
+  </div>
+
+  <div>
+    <h3>{isSpanish ? "Servicio principal" : "Main Service"}</h3>
+    <ul>
+      <li><a href={`/${lang}/emergency-plumbing/`}>
+        {isSpanish ? "Plomería de emergencia" : "Emergency Plumbing"}
+      </a></li>
+    </ul>
+  </div>
+</footer>

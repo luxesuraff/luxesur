@@ -4,27 +4,25 @@ type Props = {
   label?: string;
   subtext?: string;
   className?: string;
+  lang?: string;
 };
 
 const {
   phoneNumber = null,
   label = "Call Now",
   subtext = "",
-  className = "cta"
+  className = "cta",
+  lang = "en"
 } = Astro.props;
 
 /*
-  PRESENTATIONAL COMPONENT ONLY
-
-  All business logic must live in the page:
-  - Supabase queries
-  - vertical_cta_settings
-  - language selection
-  - call enable / disable
+PRESENTATIONAL COMPONENT ONLY
+All business logic stays in page files
 */
 ---
 
-{phoneNumber && (
+{phoneNumber ? (
+
   <a
     href={`tel:${phoneNumber}`}
     class={className}
@@ -39,5 +37,20 @@ const {
         {subtext}
       </small>
     )}
+
   </a>
+
+) : (
+
+  <a
+    href={`/${lang}/cities/`}
+    class={className}
+    role="button"
+  >
+    <span class="cta-label">
+      Cities We Serve
+    </span>
+
+  </a>
+
 )}

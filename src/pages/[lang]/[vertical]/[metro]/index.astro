@@ -10,36 +10,84 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 const SITE_URL = "https://www.luxesur.com";
 
 /* =========================
+HELPERS
+========================= */
+
+function injectLocation(text: string | null | undefined, city: string, state: string) {
+  if (!text) return "";
+
+  return text
+    .replaceAll("{city}", city)
+    .replaceAll("{state}", state);
+}
+
+function formatHeading(text: string | null | undefined) {
+  if (!text) return "";
+
+  const map: Record<string, string> = {
+    intro: "Emergency Plumbing Overview",
+    "service-overview": "Service Overview",
+    "common-causes": "Common Causes",
+    causes: "Common Causes",
+    "inspection-process": "Inspection Process",
+    "repair-options": "Repair Options",
+    "local-context": "Local Context",
+    prevention: "Prevention",
+    closing: "Service Summary",
+    "burst-pipe": "Burst Pipe Repair",
+    "burst-pipe-repair": "Burst Pipe Repair",
+    "leak-detection": "Leak Detection",
+    "drain-blockage": "Drain Blockages",
+    "drain-blockages": "Drain Blockages",
+    "water-heater": "Water Heater Issues",
+    "water-heater-issues": "Water Heater Issues",
+    "sewer-line": "Sewer Line Problems",
+    "sewer-line-problems": "Sewer Line Problems",
+    "emergency-response": "Emergency Response",
+    "damage-prevention": "Preventing Water Damage",
+    "water-damage-prevention": "Preventing Water Damage",
+    "professional-equipment": "Professional Equipment",
+    "equipment-used": "Professional Equipment"
+  };
+
+  if (map[text]) return map[text];
+
+  return text
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+/* =========================
 STATIC PATHS
 ========================= */
 
 export async function getStaticPaths() {
-
-  const { data: metros } = await supabase
+  const { data: metros } = await supabaseAdmin
     .from("metros")
-    .select("slug")
-    .eq("is_active", true);
+    .select("slug,city,state")
+    .eq("active", true);
 
-  const { data: verticals } = await supabase
+  const { data: verticals } = await supabaseAdmin
     .from("verticals")
     .select("slug");
 
-  const languages = ["en","es"];
-
+  const languages = ["en", "es"];
   const paths = [];
 
   for (const lang of languages) {
     for (const v of verticals || []) {
       for (const m of metros || []) {
-
         paths.push({
           params: {
             lang,
             vertical: v.slug,
             metro: m.slug
+          },
+          props: {
+            city: m.city,
+            state: m.state
           }
         });
-
       }
     }
   }
@@ -47,10 +95,19 @@ export async function getStaticPaths() {
   return paths;
 }
 
-const { lang, vertical, metro } = Astro.params;
+/* =========================
+PARAMS
+========================= */
 
-if (!["en","es"].includes(lang)) {
+const { lang, vertical, metro } = Astro.params;
+const { city, state } = Astro.props as { city: string; state: string };
+
+if (!lang || !["en", "es"].includes(lang)) {
   throw new Error("Invalid language");
+}
+
+if (!vertical || !metro) {
+  throw new Error("Missing route params");
 }
 
 /* =========================
@@ -61,9 +118,11 @@ const { data: verticalData } = await supabase
   .from("verticals")
   .select("id,name,hero_image")
   .eq("slug", vertical)
-  .single();
+  .maybeSingle();
 
-if (!verticalData) throw new Error("Invalid vertical");
+if (!verticalData) {
+  throw new Error(`Vertical not found: ${vertical}`);
+}
 
 /* =========================
 METRO DATA
@@ -71,61 +130,76 @@ METRO DATA
 
 const { data: metroData } = await supabase
   .from("metros")
-  .select("name,state,region_name")
+  .select("seo_intro,region_name")
   .eq("slug", metro)
-  .single();
+  .maybeSingle();
 
-if (!metroData) throw new Error("Metro not found");
+const region = metroData?.region_name || state;
+const seoIntro = metroData?.seo_intro || null;
 
-const city = metroData.name;
-const state = metroData.state;
-const region = metroData.region_name;
+/* =========================
+INTENTS / SERVICES
+========================= */
+
+const { data: intents } = await supabase
+  .from("intents")
+  .select("slug,name")
+  .eq("vertical_slug", vertical)
+  .eq("is_active", true)
+  .order("position");
+
+const services = intents || [];
+
+/* =========================
+CONTENT BLOCKS
+METRO PAGE USES VERTICAL SLUG
+========================= */
+
+const { data: contentBlocks } = await supabase
+  .from("intent_content_blocks")
+  .select("*")
+  .eq("intent_slug", vertical)
+  .eq("language_code", lang)
+  .order("position");
+
+const blocks = contentBlocks || [];
+
+/* dedupe by heading first, then body */
+const uniqueBlocks: any[] = [];
+const seen = new Set<string>();
+
+for (const b of blocks) {
+  const heading = String(b.heading || b.section || "").trim();
+  const body = String(b.body || b.content || "").trim();
+
+  const key = `${heading}::${body}`;
+
+  if (!seen.has(key) && body) {
+    uniqueBlocks.push(b);
+    seen.add(key);
+  }
+}
 
 /* =========================
 RELATED METROS
 ========================= */
 
-const { data } = await supabase
+const { data: related } = await supabase
   .from("metros")
-  .select("name,slug")
+  .select("city,slug")
   .eq("state", state)
   .neq("slug", metro)
-  .limit(6);
+  .eq("active", true)
+  .order("city")
+  .limit(8);
 
-const relatedMetros = data || [];
-
-/* =========================
-PAGE BUILD LOG
-========================= */
-
-await supabaseAdmin
-  .from("page_build_log")
-  .upsert(
-    {
-      metro_slug: metro,
-      vertical_slug: vertical,
-      language_code: lang,
-      updated_at: new Date().toISOString()
-    },
-    {
-      onConflict: "metro_slug,vertical_slug,language_code"
-    }
-  );
-
-/* =========================
-CANONICAL + HREFLANG
-========================= */
-
-const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/`;
-
-const alternateEn = `${SITE_URL}/en/${vertical}/${metro}/`;
-const alternateEs = `${SITE_URL}/es/${vertical}/${metro}/`;
+const relatedMetros = related || [];
 
 /* =========================
 FAQ
 ========================= */
 
-let faqItems = [];
+let faqItems: Array<{ question: string; answer: string; position: number }> = [];
 
 const { data: faqSet } = await supabase
   .from("faq_sets")
@@ -135,24 +209,21 @@ const { data: faqSet } = await supabase
   .maybeSingle();
 
 if (faqSet?.id) {
-
-  const { data } = await supabase
+  const { data: faqData } = await supabase
     .from("faq_items")
     .select("question,answer,position")
     .eq("faq_set_id", faqSet.id)
     .eq("is_active", true)
     .order("position");
 
-  faqItems = data || [];
+  faqItems = faqData || [];
 }
 
 /* =========================
-CTA CONTROL
+CTA
 ========================= */
 
-let callsEnabled = false;
-let phoneNumber = null;
-
+let phoneNumber: string | null = null;
 let ctaLabel = lang === "es" ? "Llamar Ahora" : "Call Now";
 let ctaSubtext = lang === "es" ? "Servicio 24/7" : "24/7 Service";
 
@@ -163,10 +234,9 @@ const { data: ctaSettings } = await supabase
   .eq("language_code", lang)
   .maybeSingle();
 
-callsEnabled = ctaSettings?.calls_enabled ?? false;
+const callsEnabled = Boolean(ctaSettings?.calls_enabled);
 
 if (callsEnabled) {
-
   const { data: ctaProfile } = await supabase
     .from("cta_profiles")
     .select("phone_number,cta_label,cta_subtext,is_active")
@@ -175,16 +245,14 @@ if (callsEnabled) {
     .maybeSingle();
 
   if (ctaProfile?.is_active && ctaProfile?.phone_number) {
-
     phoneNumber = ctaProfile.phone_number;
-
-    ctaLabel = ctaProfile.cta_label ?? ctaLabel;
-    ctaSubtext = ctaProfile.cta_subtext ?? ctaSubtext;
+    ctaLabel = ctaProfile.cta_label || ctaLabel;
+    ctaSubtext = ctaProfile.cta_subtext || ctaSubtext;
   }
 }
 
 /* =========================
-SEO TITLE
+SEO
 ========================= */
 
 const pageTitle =
@@ -192,11 +260,14 @@ const pageTitle =
     ? `${verticalData.name} en ${city}, ${state} | Luxesur`
     : `${verticalData.name} in ${city}, ${state} | Luxesur`;
 
-/* =========================
-HERO IMAGE
-========================= */
+const metaDescription =
+  lang === "es"
+    ? `Recursos informativos sobre ${verticalData.name} en ${city}, ${state}.`
+    : `Informational resources about ${verticalData.name} in ${city}, ${state}.`;
 
-const heroImage = `/images/emergency-plumbing/emergency/hero.webp`;
+const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/`;
+const alternateEn = `${SITE_URL}/en/${vertical}/${metro}/`;
+const alternateEs = `${SITE_URL}/es/${vertical}/${metro}/`;
 
 /* =========================
 SCHEMA
@@ -205,7 +276,9 @@ SCHEMA
 const serviceSchema = {
   "@context": "https://schema.org",
   "@type": "Service",
-  name: `${verticalData.name} ${lang==="es"?"en":"in"} ${city}, ${state}`,
+  name: lang === "es"
+    ? `${verticalData.name} en ${city}, ${state}`
+    : `${verticalData.name} in ${city}, ${state}`,
   areaServed: {
     "@type": "City",
     name: city
@@ -216,35 +289,11 @@ const serviceSchema = {
     url: SITE_URL
   }
 };
-
-const breadcrumbSchema = {
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  itemListElement: [
-    {
-      "@type": "ListItem",
-      position: 1,
-      name: "Home",
-      item: SITE_URL
-    },
-    {
-      "@type": "ListItem",
-      position: 2,
-      name: verticalData.name,
-      item: `${SITE_URL}/${lang}/${vertical}/`
-    },
-    {
-      "@type": "ListItem",
-      position: 3,
-      name: city,
-      item: canonicalUrl
-    }
-  ]
-};
 ---
 
 <BaseLayout
   title={pageTitle}
+  description={metaDescription}
   canonical={canonicalUrl}
   hreflang={{
     en: alternateEn,
@@ -254,102 +303,90 @@ const breadcrumbSchema = {
   lang={lang}
   faqs={faqItems}
 >
+  <script type="application/ld+json" set:html={JSON.stringify(serviceSchema)} />
 
-<script type="application/ld+json" set:html={JSON.stringify(serviceSchema)} />
-<script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
+  <Hero
+    src={verticalData.hero_image || "/images/default.webp"}
+    alt={pageTitle}
+  >
+    <CallCTA
+      phoneNumber={phoneNumber}
+      label={ctaLabel}
+      subtext={ctaSubtext}
+      lang={lang}
+    />
+  </Hero>
 
-<Hero
-  src={heroImage}
-  alt={`${verticalData.name} ${lang==="es"?"en":"in"} ${city}, ${state}`}
->
+  <h1>{pageTitle}</h1>
 
-<CallCTA
-  phoneNumber={callsEnabled ? phoneNumber : null}
-  label={ctaLabel}
-  subtext={ctaSubtext}
-  className="hero-cta"
-/>
+  <p>
+    {lang === "es"
+      ? `${verticalData.name} puede estar disponible en ${city}, ${state} y áreas cercanas dentro de la región ${region}.`
+      : `${verticalData.name} services may be available in ${city}, ${state} and surrounding areas in the ${region} region.`}
+  </p>
 
-</Hero>
+  {seoIntro && (
+    <p>{injectLocation(seoIntro, city, state)}</p>
+  )}
 
-<h1>{pageTitle}</h1>
+  <section>
+    <h2>
+      {lang === "es"
+        ? `Servicios de ${verticalData.name} disponibles en ${city}`
+        : `${verticalData.name} Services Available in ${city}`}
+    </h2>
 
-<p>
-{lang==="es"
-? `${verticalData.name} puede estar disponible en ${city} y áreas cercanas dentro de la región ${region}.`
-: `${verticalData.name} services may be available in ${city} and surrounding areas throughout the ${region} region.`}
-</p>
+    {services.length > 0 ? (
+      <ul>
+        {services.map((s) => (
+          <li>
+            <a href={`/${lang}/${vertical}/${metro}/${s.slug}/`}>
+              {lang === "es"
+                ? `${s.name} en ${city}`
+                : `${s.name} in ${city}`}
+            </a>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <p>
+        {lang === "es"
+          ? "No hay servicios disponibles en este momento."
+          : "No services are available at this time."}
+      </p>
+    )}
+  </section>
 
-<h2>{lang==="es" ? "Servicios Disponibles" : "Available Services"}</h2>
+  {uniqueBlocks.map((b) => (
+    <section>
+      <h2>{formatHeading(b.heading || b.section)}</h2>
+      <p>{injectLocation(b.body || b.content, city, state)}</p>
+    </section>
+  ))}
 
-<ul>
+  {relatedMetros.length > 0 && (
+    <section>
+      <h2>
+        {lang === "es" ? `Ciudades cerca de ${city}` : `Cities Near ${city}`}
+      </h2>
 
-<li>
-<a href={`/${lang}/${vertical}/${metro}/emergency-plumbing/`}>
-Emergency Plumbing
-</a>
-</li>
+      <ul>
+        {relatedMetros.map((m) => (
+          <li>
+            <a href={`/${lang}/${vertical}/${m.slug}/`}>
+              {lang === "es"
+                ? `${verticalData.name} en ${m.city}, ${state}`
+                : `${verticalData.name} in ${m.city}, ${state}`}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
-<li>
-<a href={`/${lang}/${vertical}/${metro}/burst-pipe/`}>
-Burst Pipe Repair
-</a>
-</li>
-
-<li>
-<a href={`/${lang}/${vertical}/${metro}/no-hot-water/`}>
-No Hot Water Repair
-</a>
-</li>
-
-<li>
-<a href={`/${lang}/${vertical}/${metro}/sewer-backup/`}>
-Sewer Backup Service
-</a>
-</li>
-
-</ul>
-
-{faqItems.length > 0 && (
-
-<section>
-
-<h2>
-{lang==="es"
-? "Preguntas Frecuentes"
-: "Frequently Asked Questions"}
-</h2>
-
-{faqItems.map((faq) => (
-
-<div>
-<h3>{faq.question}</h3>
-<p>{faq.answer}</p>
-</div>
-
-))}
-
-</section>
-
-)}
-
-<RelatedMetros
-  metros={relatedMetros}
-  lang={lang}
-  vertical={vertical}
-/>
-
-{callsEnabled && phoneNumber && (
-
-<div class="sticky-cta">
-
-<CallCTA
-phoneNumber={phoneNumber}
-label={ctaLabel}
-/>
-
-</div>
-
-)}
-
+  <RelatedMetros
+    metros={relatedMetros}
+    lang={lang}
+    vertical={vertical}
+  />
 </BaseLayout>

@@ -1,29 +1,23 @@
 import type { APIRoute } from "astro";
+import { supabase } from "../../lib/supabase";
 
 const SITE_URL = "https://www.luxesur.com";
 
 export const GET: APIRoute = async () => {
 
-const pages = [
+const { data: metros } = await supabase
+.from("metros")
+.select("state")
+.eq("is_active",true);
 
-"",
-"/about",
-"/contact",
-"/privacy",
-"/terms",
-"/coverage-map",
-"/states",
-"/cities",
-"/services"
+const states = [...new Set((metros||[]).map(m=>m.state))];
 
-];
-
-const urls = pages.map(p=>`
+const urls = states.map(s=>`
 
 <url>
-<loc>${SITE_URL}${p}</loc>
-<changefreq>monthly</changefreq>
-<priority>0.8</priority>
+<loc>${SITE_URL}/states/${s.toLowerCase()}</loc>
+<changefreq>weekly</changefreq>
+<priority>0.7</priority>
 </url>
 
 `);

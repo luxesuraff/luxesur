@@ -1,0 +1,63 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+STATIC PATHS
+========================= */
+
+export function getStaticPaths(){
+
+const letters = "abcdefghijklmnopqrstuvwxyz".split("");
+
+return letters.map(l=>({
+params:{ letter:l }
+}));
+
+}
+
+/* =========================
+PARAMS
+========================= */
+
+const { letter } = Astro.params;
+
+const { data: metros } = await supabase
+.from("metros")
+.select("name,slug,state")
+.ilike("name",`${letter}%`)
+.eq("is_active", true)
+.order("name");
+
+---
+
+<BaseLayout
+title={`Cities Starting With ${letter.toUpperCase()} | Luxesur`}
+canonical={`${SITE_URL}/cities/${letter}/`}
+>
+
+<h1>Cities Starting With "{letter.toUpperCase()}"</h1>
+
+<p>
+Browse cities beginning with the letter {letter.toUpperCase()} where service resources may be available.
+</p>
+
+<ul>
+
+{metros?.map((m)=> (
+
+<li>
+
+<a href={`/en/emergency-plumbing/${m.slug}/`}>
+Emergency Plumbing in {m.name}, {m.state}
+</a>
+
+</li>
+
+))}
+
+</ul>
+
+</BaseLayout>

@@ -1,62 +1,118 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
-const supabase = createClient(
-  import.meta.env.PUBLIC_SUPABASE_URL,
-  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-);
+const SITE_URL = "https://www.luxesur.com";
 
-/* Fetch all active metros */
+/* =========================
+STATIC PATHS
+========================= */
+
+export async function getStaticPaths() {
+
+  const languages = ["en","es"];
+
+  return languages.map((lang)=>({
+    params:{ lang }
+  }));
+
+}
+
+/* =========================
+PARAMS
+========================= */
+
+const { lang } = Astro.params;
+
+/* fallback safety */
+
+const language = ["en","es"].includes(lang) ? lang : "en";
+
+/* =========================
+LOAD METROS
+========================= */
 
 const { data: metros } = await supabase
   .from("metros")
-  .select("city, slug, state")
+  .select("city,state,slug")
   .eq("active", true)
-  .order("state", { ascending: true })
-  .order("city", { ascending: true });
+  .order("city");
 
-/* Group metros by state */
+const cities = metros || [];
 
-const states = {};
+/* =========================
+SEO
+========================= */
 
-metros?.forEach((m) => {
-  if (!states[m.state]) {
-    states[m.state] = [];
-  }
+const pageTitle =
+language === "es"
+  ? "Ciudades que Servimos | Luxesur"
+  : "Cities We Serve | Luxesur";
 
-  states[m.state].push(m);
-});
+const metaDescription =
+language === "es"
+  ? "Explore ciudades donde los servicios pueden estar disponibles a través de Luxesur."
+  : "Explore cities where services may be available through Luxesur.";
+
+const canonicalUrl =
+`${SITE_URL}/${language}/cities/`;
+
+/* =========================
+SCHEMA
+========================= */
+
+const itemListSchema = {
+
+  "@context":"https://schema.org",
+  "@type":"ItemList",
+
+  "itemListElement": cities.map((c,i)=>({
+
+    "@type":"ListItem",
+    "position": i+1,
+    "name": `${c.city}, ${c.state}`,
+    "url": `${SITE_URL}/${language}/emergency-plumbing/${c.slug}/`
+
+  }))
+
+};
 ---
 
 <BaseLayout
-  title="Cities We Serve | Luxesur"
-  brand="Luxesur"
-  domain="https://www.luxesur.com"
+title={pageTitle}
+description={metaDescription}
+canonical={canonicalUrl}
+lang={language}
 >
 
-<h1>Cities We Serve</h1>
+<script type="application/ld+json" set:html={JSON.stringify(itemListSchema)} />
+
+<h1>
+{language === "es"
+  ? "Ciudades que Servimos"
+  : "Cities We Serve"}
+</h1>
 
 <p>
-Luxesur connects homeowners with independent plumbing professionals
-across major metropolitan areas in the United States.
-Select your city below to view available services.
+{language === "es"
+  ? "A continuación se muestra una lista de ciudades donde pueden estar disponibles servicios relacionados."
+  : "Below is a list of cities where related services may be available."}
 </p>
 
-{Object.entries(states).map(([state, metros]) => (
-  <section>
-    <h2>{state}</h2>
+<ul class="city-list">
 
-    <ul>
-      {metros.map((m) => (
-        <li>
-          <a href={`/en/plumbing/${m.slug}/`}>
-            Plumbing Services in {m.city}, {state}
-          </a>
-        </li>
-      ))}
-    </ul>
-  </section>
+{cities.map((c)=> (
+
+<li>
+
+<a href={`/${language}/emergency-plumbing/${c.slug}/`}>
+{c.city}, {c.state}
+</a>
+
+</li>
+
 ))}
+
+</ul>
 
 </BaseLayout>

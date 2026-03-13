@@ -1,0 +1,34 @@
+---
+interface Props {
+  lang: string;
+  vertical: string;
+  metro: string;
+  intent: string;
+  suburbs: { name: string; slug: string }[];
+  title?: string;
+}
+
+const {
+  lang,
+  vertical,
+  metro,
+  intent,
+  suburbs,
+  title = "Nearby Service Areas"
+} = Astro.props;
+---
+
+{suburbs.length > 0 && (
+  <section class="suburb-links">
+    <h2>{title}</h2>
+    <ul>
+      {suburbs.map((suburb) => (
+        <li>
+          <a href={`/${lang}/${vertical}/${metro}/${intent}/${suburb.slug}/`}>
+            {suburb.name}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+)}

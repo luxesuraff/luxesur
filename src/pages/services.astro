@@ -5,13 +5,34 @@ import { supabase } from "@/lib/supabase";
 const SITE_URL = "https://www.luxesur.com";
 
 /* =========================
-FETCH VERTICALS
+FETCH DATA
 ========================= */
 
 const { data: verticals } = await supabase
 .from("verticals")
 .select("slug,name")
 .order("name");
+
+const { data: metros } = await supabase
+.from("metros")
+.select("slug,city,state")
+.eq("active",true)
+.order("city")
+.limit(50);
+
+const { data: intents } = await supabase
+.from("intents")
+.select("slug,name,vertical_slug")
+.eq("is_active",true)
+.order("position");
+
+/* =========================
+HELPERS
+========================= */
+
+function intentsByVertical(verticalSlug){
+return (intents || []).filter(i => i.vertical_slug === verticalSlug);
+}
 
 /* =========================
 SEO
@@ -85,7 +106,6 @@ lang="en"
 >
 
 <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
-
 <script type="application/ld+json" set:html={JSON.stringify(serviceListSchema)} />
 
 <h1>Home Service Resources</h1>
@@ -94,6 +114,10 @@ lang="en"
 Luxesur provides informational resources covering common residential service needs across major metropolitan areas in the United States.
 Browse service categories below to view available city pages and learn about services available in your area.
 </p>
+
+{/* =========================
+VERTICAL DIRECTORY
+========================= */}
 
 <section>
 
@@ -116,6 +140,68 @@ Browse service categories below to view available city pages and learn about ser
 </ul>
 
 </section>
+
+{/* =========================
+FEATURED SERVICE PAGES
+========================= */}
+
+<section>
+
+<h2>Popular Service Searches</h2>
+
+<ul>
+
+{verticals?.flatMap((v)=>{
+
+const verticalIntents = intentsByVertical(v.slug).slice(0,3);
+
+return verticalIntents.map(intent => (
+
+<li>
+
+<a href={`/en/${v.slug}/`}>
+{intent.name}
+</a>
+
+</li>
+
+));
+
+})}
+
+</ul>
+
+</section>
+
+{/* =========================
+CITY DISCOVERY
+========================= */}
+
+<section>
+
+<h2>Cities With Service Coverage</h2>
+
+<ul>
+
+{metros?.map((m)=> (
+
+<li>
+
+<a href={`/en/emergency-plumbing/${m.slug}/`}>
+Emergency Plumbing in {m.city}, {m.state}
+</a>
+
+</li>
+
+))}
+
+</ul>
+
+</section>
+
+{/* =========================
+ABOUT
+========================= */}
 
 <section>
 

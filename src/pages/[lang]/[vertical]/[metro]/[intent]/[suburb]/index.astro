@@ -1,0 +1,235 @@
+---
+/* =========================
+MODE CONTROL
+========================= */
+
+// 🔥 KEEP THIS FOR SCALE
+export const prerender = false;
+
+// OPTIONAL FUTURE SWITCH:
+// export const prerender = true;
+
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import CallCTA from "@/components/CallCTA.astro";
+
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+HELPERS
+========================= */
+
+function injectLocation(text, city, state, suburb) {
+  if (!text) return "";
+  return String(text)
+    .replaceAll("{city}", city)
+    .replaceAll("{state}", state)
+    .replaceAll("{suburb}", suburb);
+}
+
+function formatHeading(text) {
+  if (!text) return "";
+  return String(text)
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+/* =========================
+PARAMS VALIDATION
+========================= */
+
+const { lang, vertical, metro, intent, suburb } = Astro.params;
+
+if (!lang || !vertical || !metro || !intent || !suburb) {
+  return Astro.redirect("/404");
+}
+
+/* =========================
+METRO
+========================= */
+
+const { data: metroData } = await supabase
+  .from("metros")
+  .select("city,state")
+  .eq("slug", metro)
+  .eq("active", true)
+  .maybeSingle();
+
+if (!metroData) {
+  return Astro.redirect("/404");
+}
+
+const city = metroData.city;
+const state = metroData.state;
+
+/* =========================
+SUBURB
+========================= */
+
+const { data: suburbData } = await supabase
+  .from("suburbs")
+  .select("city,metro_slug")
+  .eq("slug", suburb)
+  .maybeSingle();
+
+if (!suburbData || suburbData.metro_slug !== metro) {
+  return Astro.redirect("/404");
+}
+
+const suburbName = suburbData.city;
+
+/* =========================
+VERTICAL
+========================= */
+
+const { data: verticalData } = await supabase
+  .from("verticals")
+  .select("id,name,hero_image")
+  .eq("slug", vertical)
+  .maybeSingle();
+
+if (!verticalData) {
+  return Astro.redirect("/404");
+}
+
+/* =========================
+INTENT
+========================= */
+
+const { data: intentData } = await supabase
+  .from("intents")
+  .select("name")
+  .eq("slug", intent)
+  .eq("vertical_slug", vertical)
+  .eq("is_active", true)
+  .maybeSingle();
+
+if (!intentData) {
+  return Astro.redirect("/404");
+}
+
+/* =========================
+CONTENT (DEDUPED + LIMITED)
+========================= */
+
+const { data: contentBlocks } = await supabase
+  .from("intent_content_blocks")
+  .select("*")
+  .eq("intent_slug", intent)
+  .eq("language_code", lang)
+  .order("position");
+
+const seenSections = new Set();
+const blocks = [];
+
+for (const b of contentBlocks || []) {
+  const section = String(b.section || b.heading || "").trim();
+  const content = String(b.content || b.body || "").trim();
+
+  if (!section || !content) continue;
+  if (seenSections.has(section)) continue;
+
+  seenSections.add(section);
+  blocks.push({ section, content });
+}
+
+// 🔥 LIMIT for SEO quality
+const finalBlocks = blocks.slice(0, 5);
+
+/* =========================
+STATE ROLLOUT CONTROL
+========================= */
+
+let monetizationEnabled = false;
+let callEnabled = false;
+
+const { data: rollout } = await supabase
+  .from("state_rollouts")
+  .select("monetization_enabled,call_enabled,form_enabled")
+  .eq("state", state)
+  .eq("vertical_slug", vertical)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (rollout) {
+  monetizationEnabled = rollout.monetization_enabled;
+  callEnabled = rollout.call_enabled;
+}
+
+/* =========================
+CTA
+========================= */
+
+let phoneNumber = null;
+
+if (monetizationEnabled && callEnabled) {
+  const { data: ctaProfile } = await supabase
+    .from("cta_profiles")
+    .select("phone_number,is_active")
+    .eq("vertical_id", verticalData.id)
+    .eq("language_code", lang)
+    .maybeSingle();
+
+  if (ctaProfile?.is_active) {
+    phoneNumber = ctaProfile.phone_number;
+  }
+}
+
+/* =========================
+SEO
+========================= */
+
+const pageTitle = `${intentData.name} in ${suburbName}, ${city}, ${state} | Luxesur`;
+
+const metaDescription = `${intentData.name} services may be available in ${suburbName}, ${city}, ${state}.`;
+
+const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/${intent}/${suburb}/`;
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: `${intentData.name} in ${suburbName}, ${city}, ${state}`,
+  areaServed: {
+    "@type": "Place",
+    name: suburbName
+  },
+  provider: {
+    "@type": "Organization",
+    name: "Luxesur",
+    url: SITE_URL
+  }
+};
+---
+
+<BaseLayout
+  title={pageTitle}
+  description={metaDescription}
+  canonical={canonicalUrl}
+  lang={lang}
+>
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />
+
+<Hero
+  src={verticalData.hero_image || "/images/default.webp"}
+  alt={pageTitle}
+>
+  <CallCTA phoneNumber={phoneNumber} />
+</Hero>
+
+<h1>{intentData.name} in {suburbName}, {city}, {state}</h1>
+
+<p>
+  {intentData.name} services may be available in {suburbName}, {city}, {state}.
+</p>
+
+{finalBlocks.map((b) => (
+  <section>
+    <h2>{formatHeading(b.section)}</h2>
+    <p>{injectLocation(b.content, city, state, suburbName)}</p>
+  </section>
+))}
+
+</BaseLayout>

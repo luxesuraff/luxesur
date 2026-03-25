@@ -3,7 +3,6 @@
 MODE CONTROL
 ========================= */
 
-// 🔥 KEEP THIS FOR SCALE
 export const prerender = false;
 
 // OPTIONAL FUTURE SWITCH:
@@ -43,7 +42,7 @@ PARAMS VALIDATION
 const { lang, vertical, metro, intent, suburb } = Astro.params;
 
 if (!lang || !vertical || !metro || !intent || !suburb) {
-  return Astro.redirect("/404");
+  return new Response("Not found", { status: 404 });
 }
 
 /* =========================
@@ -58,7 +57,7 @@ const { data: metroData } = await supabase
   .maybeSingle();
 
 if (!metroData) {
-  return Astro.redirect("/404");
+  return new Response("Not found", { status: 404 });
 }
 
 const city = metroData.city;
@@ -70,15 +69,15 @@ SUBURB
 
 const { data: suburbData } = await supabase
   .from("suburbs")
-  .select("city,metro_slug")
+  .select("name,city,metro_slug")
   .eq("slug", suburb)
   .maybeSingle();
 
 if (!suburbData || suburbData.metro_slug !== metro) {
-  return Astro.redirect("/404");
+  return new Response("Not found", { status: 404 });
 }
 
-const suburbName = suburbData.city;
+const suburbName = suburbData.name || suburbData.city;
 
 /* =========================
 VERTICAL
@@ -91,7 +90,7 @@ const { data: verticalData } = await supabase
   .maybeSingle();
 
 if (!verticalData) {
-  return Astro.redirect("/404");
+  return new Response("Not found", { status: 404 });
 }
 
 /* =========================
@@ -107,7 +106,7 @@ const { data: intentData } = await supabase
   .maybeSingle();
 
 if (!intentData) {
-  return Astro.redirect("/404");
+  return new Response("Not found", { status: 404 });
 }
 
 /* =========================

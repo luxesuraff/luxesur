@@ -1,23 +1,18 @@
 ---
+export const prerender = false;
+
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import Hero from "@/components/Hero.astro";
 import CallCTA from "@/components/CallCTA.astro";
 import RelatedMetros from "@/components/RelatedMetros.astro";
 
 import { supabase } from "@/lib/supabase";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 const SITE_URL = "https://www.luxesur.com";
 
-/* =========================
-HELPERS
-========================= */
-
 function injectLocation(text, city, state) {
   if (!text) return "";
-  return text
-    .replaceAll("{city}", city)
-    .replaceAll("{state}", state);
+  return text.replaceAll("{city}", city).replaceAll("{state}", state);
 }
 
 function formatHeading(text) {
@@ -27,57 +22,11 @@ function formatHeading(text) {
     .replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-/* =========================
-STATIC PATHS
-========================= */
-
-export async function getStaticPaths() {
-
-  const { data: metros } = await supabaseAdmin
-    .from("metros")
-    .select("slug,city,state")
-    .eq("active", true);
-
-  const { data: verticals } = await supabaseAdmin
-    .from("verticals")
-    .select("slug");
-
-  const languages = ["en","es"];
-  const paths = [];
-
-  for (const lang of languages) {
-    for (const v of verticals || []) {
-      for (const m of metros || []) {
-
-        paths.push({
-          params:{
-            lang,
-            vertical:v.slug,
-            metro:m.slug
-          },
-          props:{
-            city:m.city,
-            state:m.state
-          }
-        });
-
-      }
-    }
-  }
-
-  return paths;
-}
-
-/* =========================
-PARAMS
-========================= */
-
 const { lang, vertical, metro } = Astro.params;
-const { city, state } = Astro.props;
 
-/* =========================
-VERTICAL DATA
-========================= */
+if (!lang || !vertical || !metro) {
+  return new Response("Not found", { status: 404 });
+}
 
 const { data: verticalData } = await supabase
   .from("verticals")
@@ -85,23 +34,24 @@ const { data: verticalData } = await supabase
   .eq("slug", vertical)
   .maybeSingle();
 
-if (!verticalData) throw new Error("Vertical not found");
-
-/* =========================
-METRO DATA
-========================= */
+if (!verticalData) {
+  return new Response("Not found", { status: 404 });
+}
 
 const { data: metroData } = await supabase
   .from("metros")
-  .select("seo_intro,region_name")
+  .select("slug,city,state,seo_intro,region_name")
   .eq("slug", metro)
+  .eq("active", true)
   .maybeSingle();
 
-const region = metroData?.region_name || state;
+if (!metroData) {
+  return new Response("Not found", { status: 404 });
+}
 
-/* =========================
-INTENTS / SERVICES
-========================= */
+const city = metroData.city;
+const state = metroData.state;
+const region = metroData.region_name || state;
 
 const { data: intents } = await supabase
   .from("intents")
@@ -112,26 +62,21 @@ const { data: intents } = await supabase
 
 const services = intents || [];
 
-/* =========================
-SUBURBS
-========================= */
-
 const { data: suburbData } = await supabase
   .from("suburbs")
-  .select("slug,name")
+  .select("slug,name,city")
   .eq("metro_slug", metro)
   .order("name")
   .limit(25);
 
-const suburbs = suburbData || [];
-
-/* =========================
-CONTENT BLOCKS
-========================= */
+const suburbs = (suburbData || []).map((s) => ({
+  slug: s.slug,
+  name: s.name || s.city
+}));
 
 const { data: contentBlocks } = await supabase
   .from("intent_content_blocks")
-  .select("*")
+  .select("id,heading,section,body,content")
   .eq("vertical_slug", vertical)
   .eq("language_code", lang)
   .order("position");
@@ -139,21 +84,14 @@ const { data: contentBlocks } = await supabase
 const seen = new Set();
 const uniqueBlocks = [];
 
-for(const b of contentBlocks || []){
-
-  const key = `${b.heading}-${b.body}`;
-
-  if(seen.has(key)) continue;
+for (const b of contentBlocks || []) {
+  const key = `${b.heading || b.section}-${b.body || b.content}`;
+  if (seen.has(key)) continue;
   seen.add(key);
-
   uniqueBlocks.push(b);
 }
 
-const blocks = uniqueBlocks.slice(0,10);
-
-/* =========================
-RELATED METROS
-========================= */
+const blocks = uniqueBlocks.slice(0, 10);
 
 const { data: related } = await supabase
   .from("metros")
@@ -165,10 +103,6 @@ const { data: related } = await supabase
 
 const relatedMetros = related || [];
 
-/* =========================
-CTA
-========================= */
-
 let phoneNumber = null;
 
 const { data: ctaProfile } = await supabase
@@ -178,205 +112,108 @@ const { data: ctaProfile } = await supabase
   .eq("language_code", lang)
   .maybeSingle();
 
-if(ctaProfile?.is_active){
+if (ctaProfile?.is_active) {
   phoneNumber = ctaProfile.phone_number;
 }
 
-/* =========================
-SEO
-========================= */
-
-const pageTitle =
-`${verticalData.name} in ${city}, ${state} | Luxesur`;
-
-const metaDescription =
-`${verticalData.name} resources and service coverage in ${city}, ${state}.`;
-
-const canonicalUrl =
-`${SITE_URL}/${lang}/${vertical}/${metro}/`;
-
-/* =========================
-SCHEMA
-========================= */
+const pageTitle = `${verticalData.name} in ${city}, ${state} | Luxesur`;
+const metaDescription = `${verticalData.name} resources and service coverage in ${city}, ${state}.`;
+const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/`;
 
 const schema = {
- "@context":"https://schema.org",
- "@type":"Service",
- name:`${verticalData.name} in ${city}, ${state}`,
- areaServed:{
-   "@type":"City",
-   name:city
- },
- provider:{
-   "@type":"Organization",
-   name:"Luxesur",
-   url:SITE_URL
- }
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: `${verticalData.name} in ${city}, ${state}`,
+  areaServed: {
+    "@type": "City",
+    name: city
+  },
+  provider: {
+    "@type": "Organization",
+    name: "Luxesur",
+    url: SITE_URL
+  }
 };
 ---
 
 <BaseLayout
-title={pageTitle}
-description={metaDescription}
-canonical={canonicalUrl}
-lang={lang}
+  title={pageTitle}
+  description={metaDescription}
+  canonical={canonicalUrl}
+  lang={lang}
 >
+  <script type="application/ld+json" set:html={JSON.stringify(schema)} />
 
-<script type="application/ld+json" set:html={JSON.stringify(schema)} />
+  <Hero src={verticalData.hero_image || "/images/default.webp"} alt={pageTitle}>
+    <CallCTA phoneNumber={phoneNumber} />
+  </Hero>
 
-<Hero
-src={verticalData.hero_image || "/images/default.webp"}
-alt={pageTitle}
->
-<CallCTA phoneNumber={phoneNumber}/>
-</Hero>
+  <h1>{verticalData.name} in {city}, {state}</h1>
 
-<h1>{verticalData.name} in {city}, {state}</h1>
+  <p>
+    {verticalData.name} services may be available in {city}, {state} and surrounding areas within the {region} region.
+  </p>
 
-<p>
-{verticalData.name} services may be available in {city}, {state} and surrounding areas within the {region} region.
-</p>
+  {services.length > 0 && (
+    <section>
+      <h2>{lang === "es" ? `Servicios disponibles en ${city}` : `${verticalData.name} Services in ${city}`}</h2>
+      <ul>
+        {services.map((s) => (
+          <li>
+            <a href={`/${lang}/${vertical}/${metro}/${s.slug}/`}>{s.name} in {city}</a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
-{/* =========================
-SERVICE LINKS
-========================= */}
+  {blocks.map((b) => (
+    <section>
+      <h2>{formatHeading(b.heading || b.section)}</h2>
+      <p>{injectLocation(b.body || b.content, city, state)}</p>
+    </section>
+  ))}
 
-{services.length > 0 && (
+  {suburbs.length > 0 && services.length > 0 && (
+    <section>
+      <h2>{lang === "es" ? `Áreas cercanas en ${city}` : `Nearby Areas in ${city}`}</h2>
+      <ul>
+        {suburbs.map((s) => (
+          <li>
+            {services.map((svc) => (
+              <div>
+                <a href={`/${lang}/${vertical}/${metro}/${svc.slug}/${s.slug}/`}>{svc.name} in {s.name}</a>
+              </div>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
-<section>
+  {relatedMetros.length > 0 && (
+    <section>
+      <h2>{lang === "es" ? "Ciudades cercanas" : "Nearby Cities"}</h2>
+      <ul>
+        {relatedMetros.map((m) => (
+          <li>
+            <a href={`/${lang}/${vertical}/${m.slug}/`}>{verticalData.name} in {m.city}, {state}</a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
-<h2>
-{lang==="es"
-? `Servicios disponibles en ${city}`
-: `${verticalData.name} Services in ${city}`}
-</h2>
+  <section>
+    <h2>{lang === "es" ? "Cobertura de servicio" : "Service Coverage"}</h2>
+    <ul>
+      {relatedMetros.map((m) => (
+        <li>
+          <a href={`/${lang}/${vertical}/${m.slug}/`}>{verticalData.name} in {m.city}</a>
+        </li>
+      ))}
+    </ul>
+  </section>
 
-<ul>
-
-{services.map((s)=>(
-<li key={s.slug}>
-<a href={`/${lang}/${vertical}/${metro}/${s.slug}/`}>
-{s.name} in {city}
-</a>
-</li>
-))}
-
-</ul>
-
-</section>
-
-)}
-
-{/* =========================
-CONTENT
-========================= */}
-
-{blocks.map((b)=>(
-<section key={b.id}>
-<h2>{formatHeading(b.heading || b.section)}</h2>
-<p>{injectLocation(b.body || b.content,city,state)}</p>
-</section>
-))}
-
-{/* =========================
-SUBURBS
-========================= */}
-
-{suburbs.length > 0 && services.length > 0 && (
-
-<section>
-
-<h2>
-{lang==="es"
-? `Áreas cercanas en ${city}`
-: `Nearby Areas in ${city}`}
-</h2>
-
-<ul>
-
-{suburbs.map((s)=>(
-<li key={s.slug}>
-
-{services.map((svc)=>(
-<div>
-
-<a href={`/${lang}/${vertical}/${metro}/${svc.slug}/${s.slug}/`}>
-{svc.name} in {s.name}
-</a>
-
-</div>
-))}
-
-</li>
-))}
-
-</ul>
-
-</section>
-
-)}
-
-
-{/* =========================
-RELATED METROS
-========================= */}
-
-{relatedMetros.length>0 && (
-
-<section>
-
-<h2>
-{lang==="es"
-? "Ciudades cercanas"
-: "Nearby Cities"}
-</h2>
-
-<ul>
-
-{relatedMetros.map((m)=>(
-<li key={m.slug}>
-<a href={`/${lang}/${vertical}/${m.slug}/`}>
-{verticalData.name} in {m.city}, {state}
-</a>
-</li>
-))}
-
-</ul>
-
-</section>
-
-)}
-
-{/* =========================
-SERVICE COVERAGE INDEX
-========================= */}
-
-<section>
-
-<h2>
-{lang==="es"
-? "Cobertura de servicio"
-: "Service Coverage"}
-</h2>
-
-<ul>
-
-{relatedMetros.map((m)=>(
-<li key={m.slug}>
-<a href={`/${lang}/${vertical}/${m.slug}/`}>
-{verticalData.name} in {m.city}
-</a>
-</li>
-))}
-
-</ul>
-
-</section>
-
-<RelatedMetros
-metros={relatedMetros}
-lang={lang}
-vertical={vertical}
-/>
-
+  <RelatedMetros metros={relatedMetros} lang={lang} vertical={vertical} />
 </BaseLayout>

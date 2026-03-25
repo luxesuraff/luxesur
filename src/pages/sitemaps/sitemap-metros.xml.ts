@@ -8,7 +8,7 @@ export const GET: APIRoute = async () => {
 const { data: metros } = await supabase
 .from("metros")
 .select("slug")
-.eq("is_active",true);
+.eq("active",true);
 
 const languages = ["en","es"];
 
@@ -21,7 +21,7 @@ for(const m of metros || []){
 urls.push(`
 
 <url>
-<loc>${SITE_URL}/${lang}/emergency-plumbing/${m.slug}</loc>
+<loc>${SITE_URL}/${lang}/emergency-plumbing/${m.slug}/</loc>
 <changefreq>weekly</changefreq>
 <priority>0.8</priority>
 </url>
@@ -41,7 +41,7 @@ ${urls.join("")}
 </urlset>`;
 
 return new Response(xml,{
-headers:{ "Content-Type":"application/xml" }
+headers:{ "Content-Type":"application/xml; charset=utf-8" }
 });
 
 };

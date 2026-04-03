@@ -1,0 +1,213 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+const languages = ["en", "es"];
+
+/* =========================
+FETCH DATA
+========================= */
+
+const { data: verticals } = await supabase
+  .from("verticals")
+  .select("slug,name")
+  .order("name");
+
+const { data: metros } = await supabase
+  .from("metros")
+  .select("slug,city,state")
+  .eq("active", true)
+  .order("city");
+
+const { data: intents } = await supabase
+  .from("intents")
+  .select("slug,name,vertical_slug")
+  .eq("is_active", true)
+  .order("name");
+
+const { data: suburbs } = await supabase
+  .from("suburbs")
+  .select("slug,name,metro_slug")
+  .order("name");
+
+/* =========================
+HELPERS
+========================= */
+
+function byVertical(verticalSlug) {
+  return (intents || []).filter(i => i.vertical_slug === verticalSlug);
+}
+
+function byMetro(metroSlug) {
+  return (suburbs || []).filter(s => s.metro_slug === metroSlug);
+}
+
+function formatLang(lang) {
+  return lang === "es" ? "Español" : "English";
+}
+
+const pageTitle = "Luxesur GEO Crawl Map";
+const metaDescription =
+  "Luxesur geo crawl accelerator for cities, services, metros, intents, and suburb coverage pages.";
+---
+
+<BaseLayout
+  title={pageTitle}
+  description={metaDescription}
+  canonical={`${SITE_URL}/geo/`}
+  lang="en"
+>
+  <main class="geo-page">
+    <section>
+      <h1>Luxesur GEO Crawl Accelerator</h1>
+      <p>
+        This page exposes Luxesur service coverage URLs for crawl discovery across
+        languages, verticals, metros, intents, and suburb-level pages.
+      </p>
+    </section>
+
+    <section>
+      <h2>Primary Hubs</h2>
+      <ul>
+        <li><a href="/crawl-map/">Coverage Map</a></li>
+        <li><a href="/sitemap.xml">XML Sitemap</a></li>
+        <li><a href="/en/cities/">English Cities</a></li>
+        <li><a href="/es/cities/">Spanish Cities</a></li>
+        <li><a href="/en/services/">English Services</a></li>
+        <li><a href="/es/services/">Spanish Services</a></li>
+      </ul>
+    </section>
+
+    {languages.map((lang) => (
+      <section>
+        <h2>{formatLang(lang)}</h2>
+
+        <div class="lang-block">
+          <h3>Hub Pages</h3>
+          <ul>
+            <li><a href={`/${lang}/cities/`}>{lang.toUpperCase()} Cities</a></li>
+            <li><a href={`/${lang}/services/`}>{lang.toUpperCase()} Services</a></li>
+          </ul>
+        </div>
+
+        {(verticals || []).map((vertical) => {
+          const verticalIntents = byVertical(vertical.slug);
+
+          return (
+            <section class="vertical-block">
+              <h3>
+                <a href={`/${lang}/${vertical.slug}/`}>
+                  {vertical.name || vertical.slug}
+                </a>
+              </h3>
+
+              <details>
+                <summary>Show metro and service links for {vertical.name || vertical.slug}</summary>
+
+                {(metros || []).map((metro) => {
+                  const metroSuburbs = byMetro(metro.slug);
+
+                  return (
+                    <div class="metro-block">
+                      <h4>
+                        <a href={`/${lang}/${vertical.slug}/${metro.slug}/`}>
+                          {metro.city}, {metro.state}
+                        </a>
+                      </h4>
+
+                      {verticalIntents.length > 0 && (
+                        <>
+                          <ul>
+                            {verticalIntents.map((intent) => (
+                              <li>
+                                <a href={`/${lang}/${vertical.slug}/${metro.slug}/${intent.slug}/`}>
+                                  {intent.name} in {metro.city}, {metro.state}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {metroSuburbs.length > 0 && (
+                            <details>
+                              <summary>
+                                Show suburb links for {metro.city}, {metro.state}
+                              </summary>
+
+                              {verticalIntents.map((intent) => (
+                                <div class="suburb-intent-block">
+                                  <h5>{intent.name}</h5>
+                                  <ul>
+                                    {metroSuburbs.map((suburb) => (
+                                      <li>
+                                        <a
+                                          href={`/${lang}/${vertical.slug}/${metro.slug}/${intent.slug}/${suburb.slug}/`}
+                                        >
+                                          {intent.name} in {suburb.name}
+                                        </a>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </details>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </details>
+            </section>
+          );
+        })}
+      </section>
+    ))}
+  </main>
+</BaseLayout>
+
+<style>
+  .geo-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .geo-page h1,
+  .geo-page h2,
+  .geo-page h3,
+  .geo-page h4,
+  .geo-page h5 {
+    margin-bottom: 0.75rem;
+  }
+
+  .geo-page section {
+    margin-bottom: 2rem;
+  }
+
+  .geo-page ul {
+    margin: 0;
+    padding-left: 1.25rem;
+  }
+
+  .geo-page li {
+    margin-bottom: 0.35rem;
+  }
+
+  .vertical-block,
+  .metro-block,
+  .suburb-intent-block,
+  .lang-block {
+    margin-top: 1rem;
+  }
+
+  details {
+    margin-top: 0.75rem;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+</style>

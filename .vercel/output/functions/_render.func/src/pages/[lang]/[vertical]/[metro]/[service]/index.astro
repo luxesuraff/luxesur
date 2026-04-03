@@ -1,0 +1,376 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import CallCTA from "@/components/CallCTA.astro";
+
+import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+HELPERS
+========================= */
+
+function injectLocation(text, city, state) {
+  if (!text) return "";
+  return text
+    .replaceAll("{city}", city)
+    .replaceAll("{state}", state);
+}
+
+function formatHeading(text) {
+  if (!text) return "";
+  return text
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+/* =========================
+STATIC PATHS
+========================= */
+
+export async function getStaticPaths() {
+
+  const { data: metros } = await supabaseAdmin
+    .from("metros")
+    .select("slug,city,state")
+    .eq("active", true);
+
+  const { data: verticals } = await supabaseAdmin
+    .from("verticals")
+    .select("slug");
+
+  const { data: services } = await supabaseAdmin
+    .from("intents")
+    .select("slug,vertical_slug")
+    .eq("is_active", true);
+
+  const languages = ["en","es"];
+  const paths = [];
+
+  for (const lang of languages) {
+    for (const v of verticals || []) {
+      for (const m of metros || []) {
+
+        const serviceList = (services || []).filter(
+          s => s.vertical_slug === v.slug
+        );
+
+        for (const s of serviceList) {
+
+          paths.push({
+            params:{
+              lang,
+              vertical:v.slug,
+              metro:m.slug,
+              service:s.slug
+            },
+            props:{
+              city:m.city,
+              state:m.state
+            }
+          });
+
+        }
+
+      }
+    }
+  }
+
+  return paths;
+
+}
+
+/* =========================
+PARAMS
+========================= */
+
+const { lang, vertical, metro, service } = Astro.params;
+const { city, state } = Astro.props;
+
+/* =========================
+VERTICAL DATA
+========================= */
+
+const { data: verticalData } = await supabase
+  .from("verticals")
+  .select("id,name,hero_image")
+  .eq("slug", vertical)
+  .maybeSingle();
+
+if (!verticalData) throw new Error("Vertical not found");
+
+/* =========================
+SERVICE DATA
+========================= */
+
+const { data: serviceData } = await supabase
+  .from("intents")
+  .select("name")
+  .eq("slug", service)
+  .maybeSingle();
+
+if (!serviceData) throw new Error("Service not found");
+
+/* =========================
+CONTENT BLOCKS
+========================= */
+
+const { data: contentBlocks } = await supabase
+  .from("intent_content_blocks")
+  .select("*")
+  .eq("intent_slug", service)
+  .eq("language_code", lang)
+  .order("position");
+
+const blocks = contentBlocks || [];
+const seen = new Set();
+const finalBlocks = [];
+
+for (const b of blocks) {
+
+  const section = (b.section || "").toLowerCase().trim();
+  const content = b.content || b.body || "";
+
+  if (!section || !content) continue;
+  if (seen.has(section)) continue;
+
+  seen.add(section);
+
+  finalBlocks.push({
+    section,
+    content
+  });
+
+}
+
+const limitedBlocks = finalBlocks.slice(0,12);
+
+/* =========================
+SUBURBS
+========================= */
+
+const { data: suburbData } = await supabase
+  .from("suburbs")
+  .select("name,slug")
+  .eq("metro_slug", metro)
+  .limit(20);
+
+const suburbs = suburbData || [];
+
+/* =========================
+RELATED SERVICES
+========================= */
+
+const { data: otherServices } = await supabase
+  .from("intents")
+  .select("slug,name")
+  .eq("vertical_slug", vertical)
+  .neq("slug", service)
+  .eq("is_active", true);
+
+const relatedServices = (otherServices || []).slice(0,6);
+
+/* =========================
+NEARBY METROS
+========================= */
+
+let nearbyMetros = [];
+
+const { data: sameState } = await supabase
+  .from("metros")
+  .select("slug,city,state")
+  .eq("state", state)
+  .neq("slug", metro)
+  .limit(10);
+
+nearbyMetros = sameState || [];
+
+/* =========================
+SEO
+========================= */
+
+const pageTitle =
+`${serviceData.name} in ${city}, ${state} | Luxesur`;
+
+const metaDescription =
+`${serviceData.name} services in ${city}, ${state}. Emergency plumbing coverage including burst pipes and sewer backups.`;
+
+const canonicalUrl =
+`${SITE_URL}/${lang}/${vertical}/${metro}/${service}/`;
+
+const heroImage =
+verticalData.hero_image || "/images/default.webp";
+
+/* =========================
+SCHEMA
+========================= */
+
+const schema = {
+ "@context":"https://schema.org",
+ "@type":"Service",
+ name:`${serviceData.name} in ${city}, ${state}`,
+ areaServed:{
+   "@type":"City",
+   name:city
+ },
+ provider:{
+   "@type":"Organization",
+   name:"Luxesur",
+   url:SITE_URL
+ }
+};
+---
+
+<BaseLayout
+title={pageTitle}
+description={metaDescription}
+canonical={canonicalUrl}
+lang={lang}
+>
+
+<script type="application/ld+json" set:html={JSON.stringify(schema)} />
+
+<Hero
+src={heroImage}
+alt={`${serviceData.name} in ${city}, ${state}`}
+>
+<CallCTA />
+</Hero>
+
+<h1>{serviceData.name} in {city}, {state}</h1>
+
+{limitedBlocks.map((b)=>(
+<section>
+<h2>{formatHeading(b.section)}</h2>
+<p>{injectLocation(b.content,city,state)}</p>
+</section>
+))}
+
+{/* SUBURB LINKS */}
+
+{suburbs.length>0 && (
+
+<section>
+
+<h2>
+{lang==="es"
+? `Áreas cercanas en ${city}`
+: `Nearby Service Areas in ${city}`}
+</h2>
+
+<ul>
+
+{suburbs.map((s)=>(
+<li>
+<a href={`/${lang}/${vertical}/${metro}/${service}/${s.slug}/`}>
+{s.name}
+</a>
+</li>
+))}
+
+</ul>
+
+</section>
+
+)}
+
+{/* RELATED SERVICES */}
+
+{relatedServices.length>0 && (
+
+<section>
+
+<h2>
+{lang==="es" ? "Otros servicios" : "Other Services"}
+</h2>
+
+<ul>
+
+{relatedServices.map((s)=>(
+<li>
+<a href={`/${lang}/${vertical}/${metro}/${s.slug}/`}>
+{s.name} in {city}
+</a>
+</li>
+))}
+
+</ul>
+
+</section>
+
+)}
+
+{/* NEARBY METROS */}
+
+{nearbyMetros.length>0 && (
+
+<section>
+
+<h2>
+{lang==="es"
+? "Ciudades cercanas"
+: "Nearby Cities We Serve"}
+</h2>
+
+<ul>
+
+{nearbyMetros.map((m)=>(
+<li>
+<a href={`/${lang}/${vertical}/${m.slug}/${service}/`}>
+{serviceData.name} in {m.city}, {m.state}
+</a>
+</li>
+))}
+
+</ul>
+
+</section>
+
+)}
+
+{/* SERVICE COVERAGE INDEX (INDEXING BOOST) */}
+
+<section>
+
+<h2>
+{lang==="es"
+? "Cobertura de servicio"
+: "Service Coverage"}
+</h2>
+
+<ul>
+
+{nearbyMetros.slice(0,8).map((m)=>(
+<li>
+<a href={`/${lang}/${vertical}/${m.slug}/`}>
+{verticalData.name} in {m.city}
+</a>
+</li>
+))}
+
+</ul>
+
+</section>
+
+<footer>
+
+<nav>
+
+<h3>{lang==="es" ? "Explorar" : "Explore"}</h3>
+
+<ul>
+
+<li><a href={`/${lang}/cities/`}>Cities</a></li>
+<li><a href={`/${lang}/services/`}>Services</a></li>
+<li><a href={`/${lang}/${vertical}/`}>{verticalData.name}</a></li>
+<li><a href="/crawl-map/">Coverage Map</a></li>
+
+</ul>
+
+</nav>
+
+</footer>
+
+</BaseLayout>

@@ -1,0 +1,223 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { supabase } from "@/lib/supabase";
+import { STATES } from "@/config/states";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+HELPERS
+========================= */
+
+function titleCase(text) {
+  if (!text) return "";
+  return text.replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+/* =========================
+STATIC PATHS
+========================= */
+
+export async function getStaticPaths() {
+  const langs = ["en", "es"];
+
+  const paths = [];
+
+  for (const lang of langs) {
+    for (const state of STATES) {
+      paths.push({
+        params: {
+          lang,
+          state: state.slug
+        },
+        props: {
+          stateCode: state.code,
+          stateName: state.name,
+          stateNameEs: state.name_es
+        }
+      });
+    }
+  }
+
+  return paths;
+}
+
+/* =========================
+PARAMS
+========================= */
+
+const { lang, state } = Astro.params;
+const { stateCode, stateName, stateNameEs } = Astro.props;
+
+const isSpanish = lang === "es";
+const displayStateName = isSpanish ? stateNameEs : stateName;
+
+/* =========================
+FETCH DATA
+========================= */
+
+const { data: metros } = await supabase
+  .from("metros")
+  .select("slug,city,state")
+  .eq("active", true)
+  .eq("state", stateCode)
+  .order("city");
+
+const { data: verticals } = await supabase
+  .from("verticals")
+  .select("slug,name")
+  .order("name");
+
+const { data: intents } = await supabase
+  .from("intents")
+  .select("slug,name,vertical_slug")
+  .eq("is_active", true)
+  .order("position");
+
+/* =========================
+GROUP HELPERS
+========================= */
+
+function intentsByVertical(verticalSlug) {
+  return (intents || []).filter((i) => i.vertical_slug === verticalSlug);
+}
+
+/* =========================
+SEO
+========================= */
+
+const pageTitle = isSpanish
+  ? `Cobertura de Servicios en ${displayStateName} | Luxesur`
+  : `Service Coverage in ${displayStateName} | Luxesur`;
+
+const metaDescription = isSpanish
+  ? `Explore ciudades, áreas metropolitanas y servicios cubiertos por Luxesur en ${displayStateName}.`
+  : `Explore cities, metro areas, and service coverage by Luxesur across ${displayStateName}.`;
+
+const canonicalUrl = `${SITE_URL}/${lang}/${state}/`;
+const alternateEn = `${SITE_URL}/en/${state}/`;
+const alternateEs = `${SITE_URL}/es/${state}/`;
+
+/* =========================
+SCHEMA
+========================= */
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: pageTitle,
+  url: canonicalUrl,
+  about: {
+    "@type": "Place",
+    name: displayStateName
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "Luxesur",
+    url: SITE_URL
+  }
+};
+---
+
+<BaseLayout
+  title={pageTitle}
+  description={metaDescription}
+  canonical={canonicalUrl}
+  hreflang={{
+    en: alternateEn,
+    es: alternateEs,
+    xDefault: alternateEn
+  }}
+  lang={lang}
+>
+  <script type="application/ld+json" set:html={JSON.stringify(schema)} />
+
+  <main>
+    <section>
+      <h1>{pageTitle}</h1>
+      <p>
+        {isSpanish
+          ? `Explore cobertura por ciudad y tipo de servicio en ${displayStateName}.`
+          : `Explore city-level and service-level coverage across ${displayStateName}.`}
+      </p>
+    </section>
+
+    <section>
+      <h2>{isSpanish ? "Enlaces principales" : "Primary Links"}</h2>
+      <ul>
+        <li>
+          <a href={`/${lang}/cities/`}>
+            {isSpanish ? "Ciudades" : "Cities"}
+          </a>
+        </li>
+        <li>
+          <a href={`/${lang}/services/`}>
+            {isSpanish ? "Servicios" : "Services"}
+          </a>
+        </li>
+        <li>
+          <a href="/crawl-map/">
+            {isSpanish ? "Mapa de cobertura" : "Coverage Map"}
+          </a>
+        </li>
+        <li>
+          <a href="/geo/">
+            {isSpanish ? "Mapa GEO" : "GEO Crawl Accelerator"}
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    {verticals?.map((vertical) => {
+      const verticalIntents = intentsByVertical(vertical.slug);
+
+      return (
+        <section>
+          <h2>
+            <a href={`/${lang}/${vertical.slug}/`}>
+              {vertical.name} {isSpanish ? `en ${displayStateName}` : `in ${displayStateName}`}
+            </a>
+          </h2>
+
+          {metros && metros.length > 0 ? (
+            <>
+              <h3>{isSpanish ? "Ciudades" : "Cities"}</h3>
+              <ul>
+                {metros.slice(0, 100).map((metro) => (
+                  <li>
+                    <a href={`/${lang}/${vertical.slug}/${metro.slug}/`}>
+                      {vertical.name} {isSpanish ? `en ${metro.city}, ${metro.state}` : `in ${metro.city}, ${metro.state}`}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+
+              {verticalIntents.length > 0 && (
+                <>
+                  <h3>{isSpanish ? "Servicios destacados" : "Featured Services"}</h3>
+                  <ul>
+                    {metros.slice(0, 30).flatMap((metro) =>
+                      verticalIntents.slice(0, 4).map((intent) => (
+                        <li>
+                          <a href={`/${lang}/${vertical.slug}/${metro.slug}/${intent.slug}/`}>
+                            {intent.name} {isSpanish ? `en ${metro.city}, ${metro.state}` : `in ${metro.city}, ${metro.state}`}
+                          </a>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </>
+              )}
+            </>
+          ) : (
+            <p>
+              {isSpanish
+                ? "No hay ciudades activas para este estado todavía."
+                : "No active cities are available for this state yet."}
+            </p>
+          )}
+        </section>
+      );
+    })}
+  </main>
+</BaseLayout>

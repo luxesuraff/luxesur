@@ -1,0 +1,184 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+STATIC PATHS
+========================= */
+
+export async function getStaticPaths(){
+
+  const languages = ["en","es"];
+
+  return languages.map((lang)=>({
+    params:{ lang }
+  }));
+
+}
+
+/* =========================
+PARAMS
+========================= */
+
+const { lang } = Astro.params;
+const language = ["en","es"].includes(lang) ? lang : "en";
+
+/* =========================
+LOAD METROS
+========================= */
+
+const { data: metros } = await supabase
+.from("metros")
+.select("city,state,slug")
+.eq("active",true)
+.order("state")
+.order("city");
+
+const cities = metros || [];
+
+/* =========================
+GROUP BY STATE
+========================= */
+
+const states = {};
+
+for(const c of cities){
+
+if(!states[c.state]){
+states[c.state] = [];
+}
+
+states[c.state].push(c);
+
+}
+
+/* =========================
+SEO
+========================= */
+
+const pageTitle =
+language === "es"
+? "Ciudades que Servimos | Luxesur"
+: "Cities We Serve | Luxesur";
+
+const metaDescription =
+language === "es"
+? "Explore ciudades donde los servicios pueden estar disponibles a través de Luxesur."
+: "Explore cities where services may be available through Luxesur.";
+
+const canonicalUrl =
+`${SITE_URL}/${language}/cities/`;
+
+/* =========================
+SCHEMA
+========================= */
+
+const itemListSchema = {
+
+"@context":"https://schema.org",
+"@type":"ItemList",
+
+"itemListElement": cities.map((c,i)=>({
+
+"@type":"ListItem",
+"position":i+1,
+"name":`${c.city}, ${c.state}`,
+"url":`${SITE_URL}/${language}/emergency-plumbing/${c.slug}/`
+
+}))
+
+};
+---
+
+<BaseLayout
+title={pageTitle}
+description={metaDescription}
+canonical={canonicalUrl}
+lang={language}
+>
+
+<script type="application/ld+json" set:html={JSON.stringify(itemListSchema)} />
+
+<h1>
+{language==="es"
+? "Ciudades que Servimos"
+: "Cities We Serve"}
+</h1>
+
+<p>
+{language==="es"
+? "A continuación se muestran ciudades donde pueden estar disponibles servicios."
+: "Below are cities where services may be available."}
+</p>
+
+{/* =========================
+STATE GROUPS
+========================= */}
+
+{Object.entries(states).map(([state,metros])=>(
+
+<section>
+
+<h2>
+
+<a href={`/${language}/${state.toLowerCase()}/`}>
+{language==="es"
+? `Servicios en ${state}`
+: `Services in ${state}`}
+</a>
+
+</h2>
+
+<ul class="city-list">
+
+{metros.map((c)=> (
+
+<li>
+
+<a href={`/${language}/emergency-plumbing/${c.slug}/`}>
+{c.city}, {c.state}
+</a>
+
+</li>
+
+))}
+
+</ul>
+
+</section>
+
+))}
+
+{/* =========================
+SERVICE DIRECTORY LINKS
+========================= */}
+
+<section>
+
+<h2>
+{language==="es"
+? "Servicios Principales"
+: "Primary Services"}
+</h2>
+
+<ul>
+
+<li>
+<a href={`/${language}/emergency-plumbing/`}>
+Emergency Plumbing
+</a>
+</li>
+
+<li>
+<a href={`/${language}/services/`}>
+{language==="es" ? "Todos los servicios" : "All Services"}
+</a>
+</li>
+
+</ul>
+
+</section>
+
+</BaseLayout>

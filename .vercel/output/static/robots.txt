@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+
+# Block internal framework folders
+Disallow: /_astro/
+Disallow: /api/
+
+# Prevent crawling of potential duplicate query URLs
+Disallow: /*?*
+
+# Crawl delay (optional safety for heavy bots)
+Crawl-delay: 2
+
+# Primary sitemap
+Sitemap: https://www.luxesur.com/sitemap.xml
+Sitemap: https://www.luxesur.com/sitemap-index.xml
+# Future segmented sitemaps (safe to include now)
+Sitemap: https://www.luxesur.com/sitemap-metros.xml
+Sitemap: https://www.luxesur.com/sitemap-services.xml

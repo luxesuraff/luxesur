@@ -1,0 +1,101 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+FETCH METROS
+========================= */
+
+const { data: metros } = await supabase
+.from("metros")
+.select("slug,name,state")
+.eq("is_active", true)
+.order("state",{ascending:true})
+.order("name",{ascending:true});
+
+/* =========================
+FETCH VERTICALS
+========================= */
+
+const { data: verticals } = await supabase
+.from("verticals")
+.select("slug,name")
+.order("name",{ascending:true});
+
+/* =========================
+GROUP METROS BY STATE
+========================= */
+
+const stateMap = {};
+
+for(const m of metros || []){
+
+if(!stateMap[m.state]){
+stateMap[m.state] = [];
+}
+
+stateMap[m.state].push(m);
+
+}
+
+const states = Object.keys(stateMap).sort();
+
+/* =========================
+SEO
+========================= */
+
+const pageTitle = "States We Serve | Luxesur";
+const canonicalUrl = `${SITE_URL}/states/`;
+
+---
+
+<BaseLayout
+title={pageTitle}
+canonical={canonicalUrl}
+>
+
+<h1>States We Serve</h1>
+
+<p>
+Luxesur provides informational resources covering residential service needs across metropolitan areas throughout the United States.
+This directory organizes service coverage by state so users can quickly locate city service pages.
+</p>
+
+<p>
+Each state below lists cities where service information pages may be available.
+Select a city to explore service categories such as plumbing, HVAC, water damage restoration, and related home services.
+</p>
+
+{states.map((state)=> (
+
+<section>
+
+<h2>{state}</h2>
+
+<ul>
+
+{stateMap[state].map((m)=> (
+
+<li>
+
+{verticals?.map((v)=> (
+
+<a href={`/en/${v.slug}/${m.slug}/`}>
+{m.name} {v.name}
+</a>
+
+))}
+
+</li>
+
+))}
+
+</ul>
+
+</section>
+
+))}
+
+</BaseLayout>

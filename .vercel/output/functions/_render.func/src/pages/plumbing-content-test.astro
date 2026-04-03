@@ -1,0 +1,48 @@
+---
+import { getContentBlocks } from "../lib/getContentBlocks";
+import { renderTemplate } from "../lib/renderTemplate";
+import { selectVariant } from "../lib/selectVariant";
+
+const EMERGENCY_PLUMBING_ID =
+  "8d1074a0-37c0-4db1-9596-7fa2c48fa5a1";
+
+const metro = {
+  name: "Dallas",
+  region: "Texas",
+  slug: "dallas-tx",
+};
+
+const blocks = await getContentBlocks({
+  verticalId: EMERGENCY_PLUMBING_ID,
+  languageCode: "en",
+  regionId: null,
+});
+
+// 🔹 GROUP BY BLOCK TYPE
+const grouped = {};
+for (const block of blocks) {
+  if (!grouped[block.block_type]) {
+    grouped[block.block_type] = [];
+  }
+  grouped[block.block_type].push(block);
+}
+
+// 🔹 SELECT ONE VARIANT PER BLOCK TYPE
+const selectedBlocks = Object.values(grouped).map((variants) =>
+  selectVariant(variants, metro.slug)
+);
+---
+
+<h1>Emergency Plumbing Content Test</h1>
+
+{selectedBlocks.map((block) => (
+  <section style="margin-bottom: 32px;">
+    <h3>{block.block_type}</h3>
+    <p>
+      {renderTemplate(block.template.template_text, {
+        metro_name: metro.name,
+        region_name: metro.region,
+      })}
+    </p>
+  </section>
+))}

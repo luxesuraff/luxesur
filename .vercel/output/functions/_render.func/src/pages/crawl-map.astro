@@ -1,0 +1,92 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL,
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+);
+
+const SITE_URL = "https://www.luxesur.com";
+
+/* =========================
+FETCH DATA
+========================= */
+
+const { data: metros } = await supabase
+.from("metros")
+.select("name,slug,state")
+.eq("is_active", true)
+.order("state",{ascending:true})
+.order("name",{ascending:true});
+
+const { data: verticals } = await supabase
+.from("verticals")
+.select("slug,name")
+.order("name",{ascending:true});
+
+const { data: intents } = await supabase
+.from("intents")
+.select("slug,name,vertical_slug")
+.eq("is_active", true)
+.order("position",{ascending:true});
+
+const languages = ["en","es"];
+
+---
+
+<BaseLayout
+title="Service Coverage Map | Luxesur"
+canonical={`${SITE_URL}/crawl-map/`}
+>
+
+<h1>Service Coverage Map</h1>
+
+<p>
+This page lists service coverage areas and available services across supported metropolitan regions.
+Use the links below to explore service pages by city and service type.
+</p>
+
+{verticals?.map((vertical)=> (
+
+<section>
+
+<h2>{vertical.name}</h2>
+
+{metros?.map((metro)=> (
+
+<div>
+
+<h3>{metro.name}, {metro.state}</h3>
+
+<ul>
+
+{intents
+?.filter(i => i.vertical_slug === vertical.slug)
+.map((intent)=> (
+
+<li>
+
+{languages.map((lang)=> (
+
+<a href={`/${lang}/${vertical.slug}/${metro.slug}/${intent.slug}/`}>
+{intent.name} in {metro.name} ({lang})
+</a>
+
+))}
+
+</li>
+
+))}
+
+</ul>
+
+</div>
+
+))}
+
+</section>
+
+))}
+
+</BaseLayout>

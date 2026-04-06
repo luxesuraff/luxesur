@@ -1,0 +1,109 @@
+---
+export const prerender = false;
+
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Hero from "@/components/Hero.astro";
+import CallCTA from "@/components/CallCTA.astro";
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+const { lang, vertical, metro, intent } = Astro.params;
+
+if (!lang || !vertical || !metro || !intent) {
+  return Astro.redirect("/404");
+}
+
+const { data: metroData, error: metroError } = await supabase
+  .from("metros")
+  .select("city,state")
+  .eq("slug", metro)
+  .eq("active", true)
+  .maybeSingle();
+
+if (metroError || !metroData) {
+  console.error("METRO ERROR:", metroError);
+  return Astro.redirect("/404");
+}
+
+const { data: verticalData, error: verticalError } = await supabase
+  .from("verticals")
+  .select("id,name,hero_image")
+  .eq("slug", vertical)
+  .maybeSingle();
+
+if (verticalError || !verticalData) {
+  console.error("VERTICAL ERROR:", verticalError);
+  return Astro.redirect("/404");
+}
+
+const { data: intentData, error: intentError } = await supabase
+  .from("intents")
+  .select("name")
+  .eq("slug", intent)
+  .eq("vertical_slug", vertical)
+  .eq("is_active", true)
+  .maybeSingle();
+
+if (intentError || !intentData) {
+  console.error("INTENT ERROR:", intentError);
+  return Astro.redirect("/404");
+}
+
+const { data: contentBlocks, error: contentError } = await supabase
+  .from("intent_content_blocks")
+  .select("*")
+  .eq("intent_slug", intent)
+  .eq("language_code", lang)
+  .order("position");
+
+if (contentError) {
+  console.error("CONTENT ERROR:", contentError);
+}
+
+let phoneNumber = null;
+
+const { data: ctaProfile, error: ctaError } = await supabase
+  .from("cta_profiles")
+  .select("phone_number,is_active")
+  .eq("vertical_id", verticalData.id)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (ctaError) {
+  console.error("CTA ERROR:", ctaError);
+}
+
+if (ctaProfile?.is_active) {
+  phoneNumber = ctaProfile.phone_number;
+}
+
+const pageTitle = `${intentData.name} in ${metroData.city}, ${metroData.state} | Luxesur`;
+const metaDescription = `${intentData.name} services in ${metroData.city}, ${metroData.state}.`;
+const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/${intent}/`;
+
+const finalBlocks = (contentBlocks || []).slice(0, 6);
+---
+
+<BaseLayout
+  title={pageTitle}
+  description={metaDescription}
+  canonical={canonicalUrl}
+  lang={lang}
+>
+  <Hero
+    src={verticalData.hero_image || "/images/default.webp"}
+    alt={pageTitle}
+  >
+    <CallCTA phoneNumber={phoneNumber} />
+  </Hero>
+
+  <h1>{intentData.name} in {metroData.city}, {metroData.state}</h1>
+
+  {finalBlocks.map((b) => (
+    <section>
+      <h2>{b.section || b.heading || "Service Information"}</h2>
+      <p>{b.content || b.body || ""}</p>
+    </section>
+  ))}
+</BaseLayout>

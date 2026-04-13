@@ -1,0 +1,47 @@
+---
+export const prerender = false;
+
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+const {
+  lang: rawLang,
+  vertical: rawVertical
+} = Astro.params;
+
+const lang = rawLang?.trim().toLowerCase() || "en";
+const vertical = rawVertical?.trim().toLowerCase() || "service";
+
+function formatHeading(text) {
+  if (!text) return "";
+  return String(text)
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+const isSpanish = lang === "es";
+const verticalName = formatHeading(vertical);
+
+const title = isSpanish
+  ? `Solicitud enviada | ${verticalName}`
+  : `Request Submitted | ${verticalName}`;
+
+const description = isSpanish
+  ? `Su solicitud para ${verticalName.toLowerCase()} fue enviada.`
+  : `Your ${verticalName.toLowerCase()} request was submitted.`;
+---
+
+<BaseLayout title={title} description={description} lang={lang}>
+  <section>
+    <h1>{isSpanish ? "Solicitud enviada" : "Request Submitted"}</h1>
+    <p>
+      {isSpanish
+        ? `Gracias. Su solicitud para ${verticalName.toLowerCase()} ha sido enviada.`
+        : `Thank you. Your ${verticalName.toLowerCase()} request has been submitted.`}
+    </p>
+    <p>
+      {isSpanish
+        ? "Puede regresar al sitio para continuar revisando servicios y ubicaciones."
+        : "You can return to the site to continue reviewing services and locations."}
+    </p>
+  </section>
+</BaseLayout>

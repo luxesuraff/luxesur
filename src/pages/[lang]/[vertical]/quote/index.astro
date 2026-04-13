@@ -1,0 +1,271 @@
+---
+export const prerender = false;
+
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { supabase } from "@/lib/supabase";
+
+const SITE_URL = "https://www.luxesur.com";
+
+const {
+  lang: rawLang,
+  vertical: rawVertical
+} = Astro.params;
+
+const lang = rawLang?.trim().toLowerCase();
+const vertical = rawVertical?.trim().toLowerCase();
+
+if (!lang || !vertical) {
+  return Astro.redirect("/404");
+}
+
+function formatHeading(text) {
+  if (!text) return "";
+  return String(text)
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+/* =========================
+   VERTICAL LOOKUP
+========================= */
+const { data: verticalData, error: verticalError } = await supabase
+  .from("verticals")
+  .select("id, slug, name, hero_image")
+  .eq("slug", vertical)
+  .maybeSingle();
+
+if (verticalError || !verticalData) {
+  console.error("QUOTE VERTICAL ERROR:", verticalError, { vertical });
+  return Astro.redirect("/404");
+}
+
+/* =========================
+   CTA SETTINGS
+========================= */
+const { data: ctaSettings, error: ctaSettingsError } = await supabase
+  .from("vertical_cta_settings")
+  .select("calls_enabled, sms_enabled, form_enabled, language_code")
+  .eq("vertical_id", verticalData.id)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (ctaSettingsError) {
+  console.error("QUOTE CTA SETTINGS ERROR:", ctaSettingsError, {
+    verticalId: verticalData.id,
+    lang
+  });
+}
+
+/* =========================
+   OPTIONAL CTA PROFILE
+========================= */
+const { data: ctaProfile, error: ctaProfileError } = await supabase
+  .from("cta_profiles")
+  .select("phone_number, is_active")
+  .eq("vertical_id", verticalData.id)
+  .eq("language_code", lang)
+  .maybeSingle();
+
+if (ctaProfileError) {
+  console.error("QUOTE CTA PROFILE ERROR:", ctaProfileError, {
+    verticalId: verticalData.id,
+    lang
+  });
+}
+
+const phoneNumber =
+  ctaProfile?.is_active && ctaProfile?.phone_number
+    ? ctaProfile.phone_number
+    : null;
+
+/* =========================
+   COPY
+========================= */
+const verticalName = verticalData.name || formatHeading(vertical);
+
+const isSpanish = lang === "es";
+const formEnabled = !!ctaSettings?.form_enabled;
+const callsEnabled = !!ctaSettings?.calls_enabled;
+
+const pageTitle = isSpanish
+  ? `Solicitar cotización de ${verticalName} | Luxesur`
+  : `Request ${verticalName} Quote | Luxesur`;
+
+const metaDescription = isSpanish
+  ? `Solicite información y cotización para ${verticalName.toLowerCase()}.`
+  : `Request information and a quote for ${verticalName.toLowerCase()}.`;
+
+const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/quote/`;
+
+const heading = isSpanish
+  ? `Solicitar cotización de ${verticalName}`
+  : `Request ${verticalName} Quote`;
+
+const intro = isSpanish
+  ? `Complete el formulario para solicitar información sobre ${verticalName.toLowerCase()}, disponibilidad, precios estimados y próximos pasos.`
+  : `Complete the form below to request information about ${verticalName.toLowerCase()}, availability, estimated pricing, and next steps.`;
+
+const buttonText = isSpanish ? "Enviar solicitud" : "Submit Request";
+
+const firstNameLabel = isSpanish ? "Nombre" : "First Name";
+const lastNameLabel = isSpanish ? "Apellido" : "Last Name";
+const phoneLabel = isSpanish ? "Teléfono" : "Phone";
+const emailLabel = isSpanish ? "Correo electrónico" : "Email";
+const zipLabel = isSpanish ? "Código postal" : "ZIP Code";
+const homeownerLabel = isSpanish ? "¿Es propietario?" : "Are you the homeowner?";
+const propertyTypeLabel = isSpanish ? "Tipo de propiedad" : "Property Type";
+const messageLabel = isSpanish ? "Detalles del proyecto" : "Project Details";
+const billLabel = isSpanish ? "Factura eléctrica mensual" : "Monthly Electric Bill";
+const serviceLabel = isSpanish ? "Servicio deseado" : "Requested Service";
+const consentLabel = isSpanish
+  ? "Acepto ser contactado sobre mi solicitud."
+  : "I agree to be contacted regarding my request.";
+
+const submitNotice = isSpanish
+  ? "Este formulario es una plantilla de enrutamiento. Conéctelo a su endpoint o CRM cuando esté listo."
+  : "This form is a routing template. Connect it to your endpoint or CRM when ready.";
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "Service",
+  name: heading,
+  provider: {
+    "@type": "Organization",
+    name: "Luxesur",
+    url: SITE_URL
+  },
+  serviceType: verticalName,
+  url: canonicalUrl
+};
+---
+
+<BaseLayout
+  title={pageTitle}
+  description={metaDescription}
+  canonical={canonicalUrl}
+  lang={lang}
+>
+  <script type="application/ld+json" set:html={JSON.stringify(schema)} />
+
+  <section>
+    <h1>{heading}</h1>
+    <p>{intro}</p>
+
+    {!formEnabled && (
+      <p>
+        {isSpanish
+          ? "La captura por formulario aún no está activada para este vertical e idioma."
+          : "Form capture is not enabled yet for this vertical and language."}
+      </p>
+    )}
+
+    {callsEnabled && phoneNumber && (
+      <p>
+        {isSpanish ? "También puede llamar al " : "You may also call "}
+        <a href={`tel:${phoneNumber}`}>{phoneNumber}</a>
+      </p>
+    )}
+  </section>
+
+  <section>
+    <form method="POST" action="/api/quote-request">
+      <input type="hidden" name="lang" value={lang} />
+      <input type="hidden" name="vertical" value={vertical} />
+
+      <div>
+        <label for="first_name">{firstNameLabel}</label>
+        <input id="first_name" name="first_name" type="text" required />
+      </div>
+
+      <div>
+        <label for="last_name">{lastNameLabel}</label>
+        <input id="last_name" name="last_name" type="text" />
+      </div>
+
+      <div>
+        <label for="phone">{phoneLabel}</label>
+        <input id="phone" name="phone" type="tel" required />
+      </div>
+
+      <div>
+        <label for="email">{emailLabel}</label>
+        <input id="email" name="email" type="email" required />
+      </div>
+
+      <div>
+        <label for="zip_code">{zipLabel}</label>
+        <input id="zip_code" name="zip_code" type="text" required />
+      </div>
+
+      <div>
+        <label for="service_type">{serviceLabel}</label>
+        <input
+          id="service_type"
+          name="service_type"
+          type="text"
+          value={verticalName}
+          readonly
+        />
+      </div>
+
+      <div>
+        <label for="homeowner">{homeownerLabel}</label>
+        <select id="homeowner" name="homeowner" required>
+          <option value="">{isSpanish ? "Seleccione una opción" : "Select one"}</option>
+          <option value="yes">{isSpanish ? "Sí" : "Yes"}</option>
+          <option value="no">{isSpanish ? "No" : "No"}</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="property_type">{propertyTypeLabel}</label>
+        <select id="property_type" name="property_type">
+          <option value="">{isSpanish ? "Seleccione una opción" : "Select one"}</option>
+          <option value="single_family">
+            {isSpanish ? "Casa unifamiliar" : "Single Family"}
+          </option>
+          <option value="townhome">
+            {isSpanish ? "Townhome" : "Townhome"}
+          </option>
+          <option value="condo">
+            {isSpanish ? "Condominio" : "Condo"}
+          </option>
+          <option value="other">
+            {isSpanish ? "Otro" : "Other"}
+          </option>
+        </select>
+      </div>
+
+      {vertical === "solar" && (
+        <div>
+          <label for="monthly_bill">{billLabel}</label>
+          <select id="monthly_bill" name="monthly_bill">
+            <option value="">{isSpanish ? "Seleccione una opción" : "Select one"}</option>
+            <option value="under_100">{isSpanish ? "Menos de $100" : "Under $100"}</option>
+            <option value="100_200">{isSpanish ? "$100–$200" : "$100–$200"}</option>
+            <option value="200_300">{isSpanish ? "$200–$300" : "$200–$300"}</option>
+            <option value="300_plus">{isSpanish ? "Más de $300" : "$300+"}</option>
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label for="message">{messageLabel}</label>
+        <textarea id="message" name="message" rows="6"></textarea>
+      </div>
+
+      <div>
+        <label>
+          <input type="checkbox" name="consent" value="yes" required />
+          {consentLabel}
+        </label>
+      </div>
+
+      <div>
+        <button type="submit">{buttonText}</button>
+      </div>
+    </form>
+
+    <p>{submitNotice}</p>
+  </section>
+</BaseLayout>

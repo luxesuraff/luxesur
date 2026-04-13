@@ -12,7 +12,7 @@
     "@astrojs/cloudflare": "^12.6.12",
     "@astrojs/node": "^9.5.1",
     "@astrojs/sitemap": "^3.6.1",
-    "@supabase/supabase-js": "^2.89.0",
+    "@supabase/supabase-js": "^2.102.1",
     "astro": "^5.16.6"
   }
 }

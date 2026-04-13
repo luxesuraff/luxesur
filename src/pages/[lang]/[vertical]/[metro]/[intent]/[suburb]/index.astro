@@ -11,9 +11,9 @@ const SITE_URL = "https://www.luxesur.com";
 function injectLocation(text, city, state, suburb) {
   if (!text) return "";
   return String(text)
-    .replaceAll("{city}", city)
-    .replaceAll("{state}", state)
-    .replaceAll("{suburb}", suburb);
+    .replaceAll("{city}", city || "")
+    .replaceAll("{state}", state || "")
+    .replaceAll("{suburb}", suburb || "");
 }
 
 function formatHeading(text) {
@@ -23,112 +23,234 @@ function formatHeading(text) {
     .replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-const { lang, vertical, metro, intent, suburb } = Astro.params;
+const {
+  lang: rawLang,
+  vertical: rawVertical,
+  metro: rawMetro,
+  intent: rawIntent,
+  suburb: rawSuburb
+} = Astro.params;
+
+const lang = rawLang?.trim().toLowerCase();
+const vertical = rawVertical?.trim().toLowerCase();
+const metro = rawMetro?.trim().toLowerCase();
+const intent = rawIntent?.trim().toLowerCase();
+const suburb = rawSuburb?.trim().toLowerCase();
 
 if (!lang || !vertical || !metro || !intent || !suburb) {
   return Astro.redirect("/404");
 }
 
+/* =========================
+   METRO LOOKUP
+========================= */
 const { data: metroData, error: metroError } = await supabase
   .from("metros")
-  .select("city,state")
+  .select("city, state, slug")
   .eq("slug", metro)
   .eq("active", true)
   .maybeSingle();
 
 if (metroError || !metroData) {
-  console.error("METRO ERROR:", metroError);
+  console.error("METRO ERROR:", metroError, { metro });
   return Astro.redirect("/404");
 }
 
 const city = metroData.city;
 const state = metroData.state;
 
+/* =========================
+   SUBURB LOOKUP
+========================= */
 const { data: suburbData, error: suburbError } = await supabase
   .from("suburbs")
-  .select("name,city,metro_slug")
+  .select("slug, metro_slug")
   .eq("slug", suburb)
   .maybeSingle();
 
 if (suburbError || !suburbData) {
-  console.error("SUBURB ERROR:", suburbError);
+  console.error("SUBURB ERROR:", suburbError, { suburb });
   return Astro.redirect("/404");
 }
 
-if (suburbData.metro_slug !== metro) {
+if ((suburbData.metro_slug || "").toLowerCase().trim() !== metro) {
+  console.error("SUBURB METRO MISMATCH:", {
+    suburb,
+    suburbMetroSlug: suburbData.metro_slug,
+    metro
+  });
   return Astro.redirect("/404");
 }
 
-const suburbName = suburbData.name || suburbData.city || suburb;
+const suburbName = formatHeading(suburb);
 
+/* =========================
+   VERTICAL LOOKUP
+========================= */
 const { data: verticalData, error: verticalError } = await supabase
   .from("verticals")
-  .select("id,name,hero_image")
+  .select("id, name, hero_image, slug")
   .eq("slug", vertical)
   .maybeSingle();
 
 if (verticalError || !verticalData) {
-  console.error("VERTICAL ERROR:", verticalError);
+  console.error("VERTICAL ERROR:", verticalError, { vertical });
   return Astro.redirect("/404");
 }
 
+/* =========================
+   INTENT LOOKUP
+========================= */
 const { data: intentData, error: intentError } = await supabase
   .from("intents")
-  .select("name")
+  .select("name, slug")
   .eq("slug", intent)
   .eq("vertical_slug", vertical)
   .eq("is_active", true)
   .maybeSingle();
 
 if (intentError || !intentData) {
-  console.error("INTENT ERROR:", intentError);
+  console.error("INTENT ERROR:", intentError, { intent, vertical });
   return Astro.redirect("/404");
 }
 
+/* =========================
+   CONTENT BLOCKS
+========================= */
 const { data: contentBlocks, error: contentError } = await supabase
   .from("intent_content_blocks")
   .select("*")
   .eq("intent_slug", intent)
   .eq("language_code", lang)
-  .order("position");
+  .order("position", { ascending: true });
 
 if (contentError) {
-  console.error("CONTENT ERROR:", contentError);
+  console.error("CONTENT ERROR:", contentError, { intent, lang });
 }
 
 const seenSections = new Set();
 const blocks = [];
 
 for (const b of contentBlocks || []) {
-  const section = String(b.section || b.heading || "").trim();
-  const content = String(b.content || b.body || "").trim();
+  const section = String(b.section || b.heading || "").trim().toLowerCase();
+  const rawContent = String(b.content || b.body || "").trim();
 
-  if (!section || !content) continue;
+  if (!section || !rawContent) continue;
   if (seenSections.has(section)) continue;
+
+  const content = injectLocation(rawContent, city, state, suburbName);
 
   seenSections.add(section);
   blocks.push({ section, content });
 }
 
-const finalBlocks = blocks.slice(0, 5);
+const finalBlocks = blocks.slice(0, 8);
 
+/* =========================
+   CTA SETTINGS
+========================= */
+let ctaMode = null;
 let phoneNumber = null;
 
-const { data: ctaProfile, error: ctaError } = await supabase
-  .from("cta_profiles")
-  .select("phone_number,is_active")
+const { data: ctaSettings, error: ctaSettingsError } = await supabase
+  .from("vertical_cta_settings")
+  .select("calls_enabled, sms_enabled, form_enabled, language_code")
   .eq("vertical_id", verticalData.id)
   .eq("language_code", lang)
   .maybeSingle();
 
-if (ctaError) {
-  console.error("CTA ERROR:", ctaError);
+if (ctaSettingsError) {
+  console.error("CTA SETTINGS ERROR:", ctaSettingsError, {
+    verticalId: verticalData.id,
+    lang
+  });
 }
 
-if (ctaProfile?.is_active) {
-  phoneNumber = ctaProfile.phone_number;
+if (ctaSettings?.form_enabled) {
+  ctaMode = "form";
+} else if (ctaSettings?.calls_enabled) {
+  ctaMode = "call";
+} else if (ctaSettings?.sms_enabled) {
+  ctaMode = "sms";
 }
 
+/* =========================
+   OPTIONAL PHONE LOOKUP
+   Only used when calls are enabled
+========================= */
+if (ctaMode === "call") {
+  const { data: ctaProfile, error: ctaProfileError } = await supabase
+    .from("cta_profiles")
+    .select("phone_number, is_active")
+    .eq("vertical_id", verticalData.id)
+    .eq("language_code", lang)
+    .maybeSingle();
+
+  if (ctaProfileError) {
+    console.error("CTA PROFILE ERROR:", ctaProfileError, {
+      verticalId: verticalData.id,
+      lang
+    });
+  }
+
+  if (ctaProfile?.is_active && ctaProfile.phone_number) {
+    phoneNumber = ctaProfile.phone_number;
+  }
+}
+
+/* =========================
+   CTA COPY
+========================= */
+const formUrl = `/${lang}/${vertical}/quote/`;
+
+const ctaHeading =
+  lang === "es" ? "Solicitar información" : "Request Information";
+
+const ctaBody =
+  lang === "es"
+    ? `Reciba información sobre ${verticalData.name.toLowerCase()} para ${suburbName}, ${city}, ${state}.`
+    : `Get information about ${verticalData.name.toLowerCase()} for ${suburbName}, ${city}, ${state}.`;
+
+const ctaButtonText =
+  lang === "es" ? "Solicitar ahora" : "Request Now";
+
+/* =========================
+   FAQ COPY
+========================= */
+const faqItems =
+  lang === "es"
+    ? [
+        {
+          q: `¿Qué puede afectar ${intentData.name.toLowerCase()} en ${suburbName}?`,
+          a: `${intentData.name} en ${suburbName}, ${city}, ${state} puede depender de la condición de la propiedad, la urgencia del problema o proyecto, y el alcance específico del servicio necesario.`
+        },
+        {
+          q: `¿Está disponible el servicio en ${suburbName}, ${city}?`,
+          a: `La disponibilidad puede variar según la cobertura activa y el tipo de servicio, pero ${intentData.name.toLowerCase()} puede estar disponible en ${suburbName}, ${city}, ${state}.`
+        },
+        {
+          q: `¿Cuál suele ser el siguiente paso?`,
+          a: `El siguiente paso normalmente es revisar la necesidad del servicio, confirmar detalles de la propiedad y determinar la opción más adecuada según el problema o proyecto.`
+        }
+      ]
+    : [
+        {
+          q: `What can affect ${intentData.name.toLowerCase()} in ${suburbName}?`,
+          a: `${intentData.name} in ${suburbName}, ${city}, ${state} can depend on property condition, project urgency, and the specific scope of work required.`
+        },
+        {
+          q: `Is service available in ${suburbName}, ${city}?`,
+          a: `Availability can vary by active coverage and service type, but ${intentData.name.toLowerCase()} may be available in ${suburbName}, ${city}, ${state}.`
+        },
+        {
+          q: `What is the usual next step?`,
+          a: `The next step is usually to review the service need, confirm property details, and determine the most appropriate option based on the issue or project goals.`
+        }
+      ];
+
+/* =========================
+   PAGE META
+========================= */
 const pageTitle = `${intentData.name} in ${suburbName}, ${city}, ${state} | Luxesur`;
 const metaDescription = `${intentData.name} services may be available in ${suburbName}, ${city}, ${state}.`;
 const canonicalUrl = `${SITE_URL}/${lang}/${vertical}/${metro}/${intent}/${suburb}/`;
@@ -139,7 +261,7 @@ const schema = {
   name: `${intentData.name} in ${suburbName}, ${city}, ${state}`,
   areaServed: {
     "@type": "Place",
-    name: suburbName
+    name: `${suburbName}, ${city}, ${state}`
   },
   provider: {
     "@type": "Organization",
@@ -161,7 +283,15 @@ const schema = {
     src={verticalData.hero_image || "/images/default.webp"}
     alt={pageTitle}
   >
-    <CallCTA phoneNumber={phoneNumber} />
+    {ctaMode === "call" && phoneNumber ? (
+      <CallCTA phoneNumber={phoneNumber} />
+    ) : ctaMode === "form" ? (
+      <section>
+        <h2>{ctaHeading}</h2>
+        <p>{ctaBody}</p>
+        <a href={formUrl}>{ctaButtonText}</a>
+      </section>
+    ) : null}
   </Hero>
 
   <h1>{intentData.name} in {suburbName}, {city}, {state}</h1>
@@ -170,11 +300,61 @@ const schema = {
     {intentData.name} services may be available in {suburbName}, {city}, {state}.
   </p>
 
+  <section>
+    <h2>
+      {lang === "es"
+        ? `Por qué ${intentData.name.toLowerCase()} importa en ${suburbName}`
+        : `Why ${intentData.name} matters in ${suburbName}`}
+    </h2>
+    <p>
+      {lang === "es"
+        ? `${intentData.name} en ${suburbName}, ${city}, ${state} puede depender de las condiciones de la propiedad, el momento del problema y el alcance del servicio necesario. Una revisión temprana puede ayudar a definir la mejor siguiente acción.`
+        : `${intentData.name} in ${suburbName}, ${city}, ${state} can depend on property conditions, timing, and the scope of work required. Early review may help clarify the best next step.`}
+    </p>
+    <p>
+      {lang === "es"
+        ? `Las necesidades del proyecto o del servicio pueden variar según el tipo de propiedad, la condición del sistema y los objetivos del propietario.`
+        : `Service or project needs can vary based on property type, system condition, and the owner’s goals.`}
+    </p>
+  </section>
+
+  {(ctaMode === "form" || (ctaMode === "call" && phoneNumber)) && (
+    <section>
+      <h2>{ctaHeading}</h2>
+      <p>{ctaBody}</p>
+
+      {ctaMode === "call" && phoneNumber ? (
+        <a href={`tel:${phoneNumber}`}>{ctaButtonText}</a>
+      ) : (
+        <a href={formUrl}>{ctaButtonText}</a>
+      )}
+    </section>
+  )}
+
   {finalBlocks.map((b) => (
     <section>
       <h2>{formatHeading(b.section)}</h2>
-      <p>{injectLocation(b.content, city, state, suburbName)}</p>
+      <p>{b.content}</p>
     </section>
   ))}
-</BaseLayout>
 
+  <section>
+    <h2>{lang === "es" ? "Qué esperar" : "What to expect"}</h2>
+    <p>
+      {lang === "es"
+        ? `El proceso normalmente comienza con una revisión de la necesidad del servicio o del proyecto en ${suburbName}, ${city}, ${state}. A partir de ahí, las recomendaciones pueden variar según la propiedad, el objetivo del trabajo y la cobertura disponible.`
+        : `The process usually begins with a review of the service or project need in ${suburbName}, ${city}, ${state}. From there, recommendations can vary based on the property, the work scope, and active coverage.`}
+    </p>
+  </section>
+
+  <section>
+    <h2>{lang === "es" ? "Preguntas frecuentes" : "Frequently asked questions"}</h2>
+
+    {faqItems.map((item) => (
+      <div>
+        <h3>{item.q}</h3>
+        <p>{item.a}</p>
+      </div>
+    ))}
+  </section>
+</BaseLayout>
